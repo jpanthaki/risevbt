@@ -17,7 +17,7 @@ struct AssetListView: View {
             List(viewModel.assets, id: \.localIdentifier) { asset in
                 
                 // when we click on an list item, navigate to next view
-                NavigationLink(destination: VideoPlayerView(asset: asset)) {
+                NavigationLink(destination: SelectObjectView(videoAsset: asset)) {
                     AssetThumbnailView(asset: asset)
                 }
                 .navigationTitle("Select a Video")

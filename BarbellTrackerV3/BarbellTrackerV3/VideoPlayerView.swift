@@ -29,6 +29,9 @@ struct VideoPlayerView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.gray.opacity(0.2))
             }
+            Button(action: {}) {
+                Text("Select Video")
+            }
         }
         .navigationTitle("Video Playback")
         .toolbar {
