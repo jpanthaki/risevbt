@@ -65,7 +65,7 @@ class TrackerProcessor {
         while let frame = videoReader.nextFrame() {
             let trackingRequest = VNTrackObjectRequest(detectedObjectObservation: currentObservation)
             
-            trackingRequest.trackingLevel = .accurate
+            trackingRequest.trackingLevel = VNRequestTrackingLevel.accurate
             
             do {
                 try requestHandler.perform([trackingRequest], on: frame, orientation: videoReader.orientation)

@@ -28,8 +28,10 @@ struct TrackingOverlayView: View {
                             // Start playback if you wish
                             player.play()
                         }
+                        .scaledToFit()
                         .frame(width: geometry.size.width,
                                height: geometry.size.height)
+                    
                 } else {
                     Color.black // or ProgressView while loading
                 }
