@@ -43,7 +43,8 @@ struct SelectObjectView: View {
                         ZStack {
                             Image(uiImage: image)
                                 .resizable()
-                                .scaledToFit()
+//                                .scaledToFit()
+                                .scaledToFill()
                                 .frame(width: containerSize.width, height: containerSize.height)
                                 .clipped()
                             

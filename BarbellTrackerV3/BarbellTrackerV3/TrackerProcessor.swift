@@ -51,20 +51,22 @@ class TrackerProcessor {
             throw TrackerProcessorError.readerInitializationFailed
         }
         
-        guard let _ = videoReader.nextFrame() else {
-
-            throw TrackerProcessorError.firstFrameReadFailed
-        }
+//        guard let firstFrame = videoReader.nextFrame() else {
+//
+//            throw TrackerProcessorError.firstFrameReadFailed
+//        }
         
         var currentObservation = self.initialObservation
         
         boundingBoxes.append(currentObservation.boundingBox)
         
         let requestHandler = VNSequenceRequestHandler()
+//        let trackingRequest = VNTrackObjectRequest(detectedObjectObservation: currentObservation)
+//        trackingRequest.trackingLevel = VNRequestTrackingLevel.accurate
         
         while let frame = videoReader.nextFrame() {
-            let trackingRequest = VNTrackObjectRequest(detectedObjectObservation: currentObservation)
             
+            let trackingRequest = VNTrackObjectRequest(detectedObjectObservation: currentObservation)
             trackingRequest.trackingLevel = VNRequestTrackingLevel.accurate
             
             do {
@@ -78,7 +80,9 @@ class TrackerProcessor {
             }
             
             currentObservation = newObservation
+//            trackingRequest.inputObservation = currentObservation
             boundingBoxes.append(currentObservation.boundingBox)
+        
         }
         
         return boundingBoxes

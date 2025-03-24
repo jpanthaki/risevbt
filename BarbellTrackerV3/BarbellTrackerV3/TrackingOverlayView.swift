@@ -28,7 +28,8 @@ struct TrackingOverlayView: View {
                             // Start playback if you wish
                             player.play()
                         }
-                        .scaledToFit()
+//                        .scaledToFit()
+                        .scaledToFill()
                         .frame(width: geometry.size.width,
                                height: geometry.size.height)
                     
@@ -42,6 +43,7 @@ struct TrackingOverlayView: View {
 //                    
 //                    Rectangle()
 //                        .stroke(Color.red, lineWidth: 2)
+//                        .opacity(0.5)
 //                        .frame(width: denormalized.width,
 //                               height: denormalized.height)
 //                        .position(x: denormalized.midX,
