@@ -8,89 +8,93 @@
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
 
-// BLE UUIDs for service and characteristic
+// BLE UUIDs
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 BLECharacteristic *pCharacteristic;
+BLEAdvertising *pAdvertising;
 
 #define OPERATION_MODE_NDOF 0x0C
 
+bool isAdvertising = false;
+
+// ✅ Add BLE Disconnect Handler
+class MyServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) {
+    Serial.println("✅ BLE client connected.");
+    isAdvertising = false;
+  }
+
+  void onDisconnect(BLEServer* pServer) {
+    Serial.println("❌ BLE client disconnected. Restarting advertising...");
+    delay(500); // Short delay before restarting
+    BLEDevice::startAdvertising();
+    isAdvertising = true;
+  }
+};
+
 void setup() {
   Serial.begin(115200);
+  BLEDevice::deinit(true);  // Reset BLE
+  delay(1000);
+  BLEDevice::init("JAMSHED_P");
 
-  // Initialize BNO055
+  // Init IMU
   while (!bno.begin()) {
     Serial.println("BNO055 not detected");
     delay(1000);
   }
-  Serial.println("BNO055 now detected");
-
   bno.setMode((adafruit_bno055_opmode_t)OPERATION_MODE_NDOF);
-  bno.setExtCrystalUse(true); // Use external crystal for better accuracy
-
+  bno.setExtCrystalUse(true);
   Serial.println("BNO055 Initialized in NDOF mode");
 
-  // Initialize BLE
-  BLEDevice::init("JAMSHED_P"); // BLE device name
+  // BLE Server
   BLEServer *pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks()); // 👈 Set disconnect handler
   BLEService *pService = pServer->createService(SERVICE_UUID);
 
   pCharacteristic = pService->createCharacteristic(
-                      CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_NOTIFY
-                    );
-
+    CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_NOTIFY
+  );
   pCharacteristic->addDescriptor(new BLE2902());
   pService->start();
 
   // Start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);  // Ensure it appears in scans
-  pAdvertising->setMinPreferred(0x06);  // Set BLE connection parameters
+  pAdvertising->setScanResponse(true);
+  pAdvertising->setMinPreferred(0x06);
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
+  isAdvertising = true;
 
   Serial.println("BLE IMU started. Connect using LightBlue app.");
 }
 
 void loop() {
-  // Get Linear Acceleration
+  // Read IMU data
   imu::Vector<3> lin_accel = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
-
-//   // Get Gyroscope Data
   imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-
-//   // Get Euler Angles
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
 
-  // Format data as a string
   String accel_data = "LinAcc X:" + String(lin_accel.x()) +
-                "LinAcc Y:" + String(lin_accel.y()) +
-                "LinAcc Z:" + String(lin_accel.z());
-
-  // Format data as a string
+                      "LinAcc Y:" + String(lin_accel.y()) +
+                      "LinAcc Z:" + String(lin_accel.z());
   String gyro_data = "Gyro X:" + String(gyro.x()) +
-                "Gyro Y:" + String(gyro.y()) +
-                "Gyro Z:" + String(gyro.z());
-
-  // Format data as a string
+                     "Gyro Y:" + String(gyro.y()) +
+                     "Gyro Z:" + String(gyro.z());
   String euler_data = "Roll (Euler X):" + String(euler.x()) +
-                "Pitch (Euler Y):" + String(euler.y()) +
-                "Yaw (Euler Z):" + String(euler.z());
-  
+                      "Pitch (Euler Y):" + String(euler.y()) +
+                      "Yaw (Euler Z):" + String(euler.z());
 
-  // Send data over BLE
-  pCharacteristic->setValue(accel_data.c_str());
-  pCharacteristic->notify();
-  pCharacteristic->setValue(gyro_data.c_str());
-  pCharacteristic->notify();
-  pCharacteristic->setValue(euler_data.c_str());
+  String combined = accel_data + ";" + gyro_data + ";" + euler_data;
+
+  // Notify
+  pCharacteristic->setValue(combined.c_str());
   pCharacteristic->notify();
 
-  Serial.println(accel_data);
-  Serial.println(gyro_data);
-  Serial.println(euler_data);
-  delay(200); // Adjust streaming rate
+  Serial.println(combined);
+  delay(500);
 }
