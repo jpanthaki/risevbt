@@ -22,6 +22,28 @@ smooth_window = 5
 USE_SMOOTHING = True
 csv_filename = "imu_log.csv"
 
+# === Smoothing ===
+def moving_average(data, window):
+    if len(data) < window:
+        return data
+    return [sum(data[i - window:i]) / window for i in range(window, len(data) + 1)]
+
+
+# === Kalman Filter Class ===
+class KalmanFilter:
+    def __init__(self, process_noise=1e-5, measurement_noise=1e-2, estimate_error=1.0):
+        self.q = process_noise
+        self.r = measurement_noise
+        self.p = estimate_error
+        self.x = 0.0
+
+    def update(self, measurement):
+        self.p += self.q
+        k = self.p / (self.p + self.r)
+        self.x += k * (measurement - self.x)
+        self.p *= (1 - k)
+        return self.x
+
 # === Shared Buffers ===
 shared_data = {
     "acc_x": deque(maxlen=buffer_size),
@@ -35,31 +57,43 @@ shared_data = {
     "vel_z": deque(maxlen=buffer_size),
 }
 
+kalman = {
+    "vel_x": KalmanFilter(),
+    "vel_y": KalmanFilter(),
+    "vel_z": KalmanFilter(),
+}
+
 recording = True
 lock = threading.Lock()
 logfile = open(csv_filename, "w", newline="")
 writer = csv.writer(logfile)
-writer.writerow(["Time", "Acc X", "Acc Y", "Acc Z", "Gyro X", "Gyro Y", "Gyro Z", "Vel X", "Vel Y", "Vel Z"])
+writer.writerow([
+    "Time", "Acc X", "Acc Y", "Acc Z",
+    "Gyro X", "Gyro Y", "Gyro Z",
+    "Euler X", "Euler Y", "Euler Z",
+    "Calib Sys", "Calib Gyro", "Calib Accel", "Calib Mag"
+])
 
-# === Smoothing ===
-def moving_average(data, window):
-    if len(data) < window:
-        return data
-    return [sum(data[i - window:i]) / window for i in range(window, len(data) + 1)]
-
+# === BLE Notification Handler ===
 # === BLE Notification Handler ===
 last_time = None
 vel = [0.0, 0.0, 0.0]
+alpha = 0.5  # Low-pass filter coefficient (0 = smoothest, 1 = raw)
+
+# Previous raw acceleration for filtering
+acc_prev = [0.0, 0.0, 0.0]
 
 def notification_handler(sender, data):
     global recording, last_time, vel
+
     line = data.decode().strip()
     print(f"\n🔵 RAW: '{line}'")
 
     match = re.search(
         r"LinAcc X:(-?\d+\.\d+)LinAcc Y:(-?\d+\.\d+)LinAcc Z:(-?\d+\.\d+);"
         r"Gyro X:(-?\d+\.\d+)Gyro Y:(-?\d+\.\d+)Gyro Z:(-?\d+\.\d+);"
-        r"Roll \(Euler X\):(-?\d+\.\d+)Pitch \(Euler Y\):(-?\d+\.\d+)Yaw \(Euler Z\):(-?\d+\.\d+)",
+        r"Roll \(Euler X\):(-?\d+\.\d+)Pitch \(Euler Y\):(-?\d+\.\d+)Yaw \(Euler Z\):(-?\d+\.\d+);"
+        r"Calib Sys:(\d+) Gyro:(\d+) Accel:(\d+) Mag:(\d+)",
         line
     )
 
@@ -71,35 +105,40 @@ def notification_handler(sender, data):
         dt = (now - last_time).total_seconds()
         last_time = now
 
-        acc = [float(match.group(i)) for i in range(1, 4)]
-        gyro = [float(match.group(i)) for i in range(4, 7)]
+        vals = [float(match.group(i)) for i in range(1, 10)]
+        calib = [int(match.group(i)) for i in range(10, 14)]
 
-        vel = [v + a * dt for v, a in zip(vel, acc)]
+        acc = vals[0:3]
+        gyro = vals[3:6]
+
+        # === Low-pass filter and clamping ===
+        alpha = 0.5  # Place this inside the function
+        acc_filtered = [alpha * a + (1 - alpha) * v for a, v in zip(acc, vel)]
+        acc_clamped = [0.0 if abs(a) < 0.05 else a for a in acc_filtered]
+        vel[:] = [v + a * dt for v, a in zip(vel, acc_clamped)]
 
         with lock:
             for axis, a in zip("xyz", acc):
                 shared_data[f"acc_{axis}"].append(a)
             for axis, g in zip("xyz", gyro):
                 shared_data[f"gyro_{axis}"].append(g)
-            for axis, v in zip("xyz", vel):
-                shared_data[f"vel_{axis}"].append(v)
+            for axis, v_ in zip("xyz", vel):
+                shared_data[f"vel_{axis}"].append(v_)
 
         if recording:
             timestamp = now.isoformat()
-            writer.writerow([timestamp] + acc + gyro + vel)
+            writer.writerow([timestamp] + vals + calib)
             print("✅ Logged and appended")
     else:
         print("❌ No match")
+
+
 
 # === BLE Thread ===
 async def ble_loop():
     print("🔍 Scanning for device...")
     devices = await BleakScanner.discover()
-    target = None
-    for d in devices:
-        if d.name and DEVICE_NAME in d.name:
-            target = d
-            break
+    target = next((d for d in devices if d.name and DEVICE_NAME in d.name), None)
 
     if not target:
         print(f"❌ Device {DEVICE_NAME} not found")
@@ -127,12 +166,7 @@ plots = {
 lines = {}
 for key, ax in plots.items():
     ax.set_xlim(0, buffer_size)
-    if key == "acc":
-        ax.set_ylim(-2, 2)
-    elif key == "gyro":
-        ax.set_ylim(-10, 10)
-    elif key == "vel":
-        ax.set_ylim(-5, 5)
+    ax.set_ylim(-10, 10) if key != "acc" else ax.set_ylim(-2, 2)
     ax.set_title(key.upper())
     ax.grid(True)
 
@@ -143,11 +177,12 @@ lines["vel"] = [plots["vel"].plot([], [], label=axis)[0] for axis in "XYZ"]
 for ax in axs:
     ax.legend()
 
+
 def update(frame):
     with lock:
-        acc = [list(shared_data[f"acc_{axis.lower()}"]) for axis in "XYZ"]
-        gyro = [list(shared_data[f"gyro_{axis.lower()}"]) for axis in "XYZ"]
-        vel = [list(shared_data[f"vel_{axis.lower()}"]) for axis in "XYZ"]
+        acc = [list(shared_data[f"acc_{axis}"]) for axis in "xyz"]
+        gyro = [list(shared_data[f"gyro_{axis}"]) for axis in "xyz"]
+        vel = [list(shared_data[f"vel_{axis}"]) for axis in "xyz"]
 
     def safe_plot(ax, line_objs, data_group):
         ax.relim()
