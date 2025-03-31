@@ -93,7 +93,8 @@ def notification_handler(sender, data):
         r"LinAcc X:(-?\d+\.\d+)LinAcc Y:(-?\d+\.\d+)LinAcc Z:(-?\d+\.\d+);"
         r"Gyro X:(-?\d+\.\d+)Gyro Y:(-?\d+\.\d+)Gyro Z:(-?\d+\.\d+);"
         r"Roll \(Euler X\):(-?\d+\.\d+)Pitch \(Euler Y\):(-?\d+\.\d+)Yaw \(Euler Z\):(-?\d+\.\d+);"
-        r"Calib Sys:(\d+) Gyro:(\d+) Accel:(\d+) Mag:(\d+)",
+        r"Calib Sys:(\d+) Gyro:(\d+) Accel:(\d+) Mag:(\d+);"
+        r"Vx:(-?\d+\.\d+)Vy:(-?\d+\.\d+)Vz:(-?\d+\.\d+)",
         line
     )
 
@@ -112,10 +113,22 @@ def notification_handler(sender, data):
         gyro = vals[3:6]
 
         # === Low-pass filter and clamping ===
-        alpha = 0.5  # Place this inside the function
+        # === Low-pass filter and clamping ===
+        alpha = 0.5
         acc_filtered = [alpha * a + (1 - alpha) * v for a, v in zip(acc, vel)]
-        acc_clamped = [0.0 if abs(a) < 0.05 else a for a in acc_filtered]
-        vel[:] = [v + a * dt for v, a in zip(vel, acc_clamped)]
+        acc_clamped = [0.0 if abs(a) < 0.10 else a for a in acc_filtered]
+
+        # Integrate to velocity
+        new_vel = [v + a * dt for v, a in zip(vel, acc_clamped)]
+
+        # Apply Kalman filter to velocity
+        vel[0] = kalman["vel_x"].update(new_vel[0])
+        vel[1] = kalman["vel_y"].update(new_vel[1])
+        vel[2] = kalman["vel_z"].update(new_vel[2])
+
+        # Apply Kalman filter to velocity
+        vel[0:3] = [float(match.group(i)) for i in range(14, 17)]
+
 
         with lock:
             for axis, a in zip("xyz", acc):
