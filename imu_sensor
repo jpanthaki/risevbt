@@ -79,22 +79,24 @@ void loop() {
   imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
 
-  String accel_data = "LinAcc X:" + String(lin_accel.x()) +
-                      "LinAcc Y:" + String(lin_accel.y()) +
-                      "LinAcc Z:" + String(lin_accel.z());
-  String gyro_data = "Gyro X:" + String(gyro.x()) +
-                     "Gyro Y:" + String(gyro.y()) +
-                     "Gyro Z:" + String(gyro.z());
-  String euler_data = "Roll (Euler X):" + String(euler.x()) +
-                      "Pitch (Euler Y):" + String(euler.y()) +
-                      "Yaw (Euler Z):" + String(euler.z());
+  // Read calibration status
+  uint8_t sys, gyroCalib, accelCalib, magCalib;
+  bno.getCalibration(&sys, &gyroCalib, &accelCalib, &magCalib);
 
-  String combined = accel_data + ";" + gyro_data + ";" + euler_data;
+  // Format full data string
+  String combined = 
+    "LinAcc X:" + String(lin_accel.x()) + "LinAcc Y:" + String(lin_accel.y()) + "LinAcc Z:" + String(lin_accel.z()) + ";" +
+    "Gyro X:" + String(gyro.x()) + "Gyro Y:" + String(gyro.y()) + "Gyro Z:" + String(gyro.z()) + ";" +
+    "Roll (Euler X):" + String(euler.x()) +
+    "Pitch (Euler Y):" + String(euler.y()) +
+    "Yaw (Euler Z):" + String(euler.z()) + ";" +
+    "Calib Sys:" + String(sys) + " Gyro:" + String(gyroCalib) + " Accel:" + String(accelCalib) + " Mag:" + String(magCalib);
 
-  // Notify
+  // Send over BLE
   pCharacteristic->setValue(combined.c_str());
   pCharacteristic->notify();
 
+  // Debug to serial
   Serial.println(combined);
   delay(500);
 }
