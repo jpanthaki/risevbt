@@ -17,6 +17,26 @@ BLEAdvertising *pAdvertising;
 
 #define OPERATION_MODE_NDOF 0x0C
 
+float thetaM;
+float phiM;
+float thetaFold = 0;
+float thetaFnew;
+float phiFold = 0;
+float phiFnew;
+
+float thetaG = 0;
+float phiG = 0;
+
+float theta;
+float phi;
+
+unsigned long millisOld;
+unsigned long time1;
+float dt;
+
+float Vx, Vy, Vz;
+float initVx, initVy, initVz = 0;
+
 bool isAdvertising = false;
 
 // ✅ Add BLE Disconnect Handler
@@ -79,6 +99,21 @@ void loop() {
   imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
 
+  dt = (millis() - millisOld) / 1000.; 
+  millisOld = millis();
+  theta = (theta + gyro.y() * dt) * 0.95 + thetaM * 0.05;
+  phi = (phi - gyro.x() * dt) * 0.95 + phiM * 0.05;
+  thetaG = thetaG + gyro.y() * dt;
+  phiG = phiG - gyro.x() * dt;
+
+  time1 = millisOld / 1000;
+
+  Vx = initVx + lin_accel.x() * dt;
+  Vy = initVy + lin_accel.y() * dt;
+  Vz = (initVz + lin_accel.z() * dt) - 1;
+
+
+
   // Read calibration status
   uint8_t sys, gyroCalib, accelCalib, magCalib;
   bno.getCalibration(&sys, &gyroCalib, &accelCalib, &magCalib);
@@ -90,7 +125,8 @@ void loop() {
     "Roll (Euler X):" + String(euler.x()) +
     "Pitch (Euler Y):" + String(euler.y()) +
     "Yaw (Euler Z):" + String(euler.z()) + ";" +
-    "Calib Sys:" + String(sys) + " Gyro:" + String(gyroCalib) + " Accel:" + String(accelCalib) + " Mag:" + String(magCalib);
+    "Calib Sys:" + String(sys) + " Gyro:" + String(gyroCalib) + " Accel:" + String(accelCalib) + " Mag:" + String(magCalib) + ";" + 
+    "Vx:" + String(Vx) + "Vy:" + String(Vy) + "Vz:" + String(Vz);
 
   // Send over BLE
   pCharacteristic->setValue(combined.c_str());
