@@ -28,8 +28,8 @@ struct TrackingOverlayView: View {
                             // Start playback if you wish
                             player.play()
                         }
-//                        .scaledToFit()
-                        .scaledToFill()
+                        .scaledToFit()
+//                        .scaledToFill()
                         .frame(width: geometry.size.width,
                                height: geometry.size.height)
                     
