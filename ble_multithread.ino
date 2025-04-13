@@ -19,7 +19,8 @@ BLECharacteristic* pCommandCharacteristic = NULL;
 
 volatile bool deviceConnected = false;
 volatile bool oldDeviceConnected = false;
-volatile bool seriesStartFlag = false;
+volatile bool sendData = false;
+volatile bool seriesStopFlag = true;
 
 class MyServerCallbacks: public BLEServerCallbacks {
 
@@ -40,8 +41,13 @@ class MyCharacteristicCallbacks: public BLECharacteristicCallbacks {
       Serial.println(rxValue.c_str());
 
       if (rxValue.equals("start")) {
-        seriesStartFlag = true;
+        sendData = true;
         Serial.println("Start command received: will send messages...");
+      }
+
+      if (rxValue.equals("stop")) {
+        sendData = false;
+        Serial.println("Stop command received: stop sending messages...");
       }
     }
   }
@@ -96,11 +102,11 @@ void dataUpdateTask(void *parameters) {
 
   while (true) {
 
-    while (!seriesStartFlag) {
+    while (!sendData) {
       vTaskDelay(pdMS_TO_TICKS(10));
     }
 
-    if (seriesStartFlag) {
+    if (sendData) {
       for (int i = 0; i < 10; i++) {
         snprintf(packetBuffer, PACKET_BUFFER_SIZE, "{\"x\": %ld, \"y\": %ld}", x, y);
 
@@ -114,7 +120,7 @@ void dataUpdateTask(void *parameters) {
         vTaskDelay(pdMS_TO_TICKS(3));
       }
       pos = !pos;
-      seriesStartFlag = false;
+      // sendData = false;
     }
 
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
@@ -147,7 +153,8 @@ void setup() {
   pCommandCharacteristic = pService->createCharacteristic(
                            COMMAND_CHARACTERISTIC_UUID,
                            BLECharacteristic::PROPERTY_WRITE | 
-                           BLECharacteristic::PROPERTY_READ
+                           BLECharacteristic::PROPERTY_READ |
+                           BLECharacteristic::PROPERTY_WRITE_NR
                          );
   pCommandCharacteristic->setCallbacks(new MyCharacteristicCallbacks());
 
