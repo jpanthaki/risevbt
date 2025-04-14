@@ -8,6 +8,22 @@
 import SwiftUI
 import Charts
 
+
+struct RecordView : View {
+    
+    @StateObject var service = BluetoothService()
+    
+    var body: some View {
+        
+        ZStack {
+            Color.blue.opacity(0.5)
+                .ignoresSafeArea()
+            Text("RECORD")
+        }
+        
+    }
+}
+
 struct RecordViewThatWorks: View {
     @StateObject var service = BluetoothService()
     
@@ -46,5 +62,5 @@ struct RecordViewThatWorks: View {
 }
 
 #Preview {
-    RecordViewThatWorks()
+    RecordView()
 }

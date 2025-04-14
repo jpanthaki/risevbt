@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct HomeView: View {
+    
     var body: some View {
         NavigationStack {
             ZStack{
@@ -36,7 +37,7 @@ struct HomeView: View {
                                             .font(.title)
                                     )
                             }
-                            NavigationLink(destination: Page1View()) {
+                            NavigationLink(destination: RecordViewThatWorks()) {
                                 RoundedRectangle(cornerRadius:20)
                                     .fill(Color.gray.opacity(0.4))
                                     .padding()
