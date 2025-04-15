@@ -18,6 +18,14 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55);
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define COMMAND_CHARACTERISTIC_UUID "1c902c8d-88bb-44f9-9dea-0bc5bf2d0af4"
 
+unsigned long millisOld;
+unsigned long time1;
+float dt;
+
+float Vx, Vy, Vz;
+float initVx, initVy, initVz = 0;
+
+
 BLEServer* pServer = NULL;
 BLECharacteristic* pDataCharacteristic = NULL;
 BLECharacteristic* pCommandCharacteristic = NULL;
@@ -123,6 +131,15 @@ void loop() {
 
   static unsigned long packetTime = millis();
 
+  dt = (millis() - millisOld) / 1000.; 
+  millisOld = millis();
+
+  time1 = millisOld / 1000;
+
+  Vx = initVx + acc.x() * dt;
+  Vy = initVy + acc.y() * dt;
+  Vz = (initVz + acc.z() * dt) - 1;
+
   StaticJsonDocument<512> doc;
   doc["packet_time_stamp"] = packetTime;
   doc["dir"] = direction;
@@ -131,8 +148,8 @@ void loop() {
 
   JsonObject entry = data.createNestedObject();
   entry["time_stamp"] = millis() / 1000.0;
-  entry["velocity"] = acc.x();  // Replace with your velocity calculation if needed
-  entry["accel"] = acc.z();     // Use appropriate axis
+  entry["velocity"] = Vy;  // Replace with your velocity calculation if needed
+  entry["accel"] = acc.y();     // Use appropriate axis
   entry["pitch"] = euler.y();
   entry["yaw"] = euler.z();
 
