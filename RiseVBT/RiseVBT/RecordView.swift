@@ -18,7 +18,70 @@ struct RecordView : View {
         ZStack {
             Color.blue.opacity(0.5)
                 .ignoresSafeArea()
-            Text("RECORD")
+            VStack {
+                Text(service.peripheralStatus.rawValue)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top, 30)
+                    .padding(.bottom, 30)
+                ZStack{
+                    RoundedRectangle(cornerRadius: 30)
+                        .fill(Color.blue.opacity(0.4))
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.gray.opacity(0.4))
+                        VStack {
+                            Text("\(String(format: "%.2f", service.computedMCV ?? 0.0))")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .foregroundColor(service.computedMCV ?? 0.0 > 0.5 ? Color.green : Color.red)
+                                
+                            Text("m/s")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                        }
+                    }
+                    .padding()
+                }
+                .padding(.bottom, 10)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 30)
+                        .fill(Color.blue.opacity(0.4))
+                    HStack {
+                        Button {
+                            if service.peripheralStatus.rawValue == "connected" {
+                                service.sendStartCommand()
+                            }
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(Color.gray.opacity(0.4))
+                                Text("Start\nRecording")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(Color.black)
+                            }
+                        }
+                        Button {
+                            if service.peripheralStatus.rawValue == "connected" {
+                                service.sendStopCommand()
+                            }
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(Color.gray.opacity(0.4))
+                                Text("Stop\nRecording")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(Color.black)
+                            }
+                        }
+                    }
+                    .padding()
+                }
+                .padding(.bottom, 100)
+            }
+            .padding()
         }
         
     }

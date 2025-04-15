@@ -31,13 +31,13 @@ struct HomeView: View {
                                     .fill(Color.gray.opacity(0.4))
                                     .padding()
                                     .overlay(
-                                        Text("Connect RiseVBT\nDevice")
+                                        Text("Record Video")
                                             .fontWeight(.heavy)
                                             .foregroundColor(.black.opacity(0.7))
                                             .font(.title)
                                     )
                             }
-                            NavigationLink(destination: RecordViewThatWorks()) {
+                            NavigationLink(destination: RecordView()) {
                                 RoundedRectangle(cornerRadius:20)
                                     .fill(Color.gray.opacity(0.4))
                                     .padding()
