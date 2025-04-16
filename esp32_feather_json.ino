@@ -14,8 +14,8 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55);
 #define OPERATION_MODE_NDOF 0x0C
 
 // BLE UUIDs
-#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define SERVICE_UUID        "7c961cfd-2527-4808-a9b0-9ce954427712"
+#define CHARACTERISTIC_UUID "207a2a33-ab38-4748-8702-5ff50b2d673f"
 #define COMMAND_CHARACTERISTIC_UUID "1c902c8d-88bb-44f9-9dea-0bc5bf2d0af4"
 
 unsigned long millisOld;
@@ -69,7 +69,7 @@ void setup() {
   Serial.begin(115200);
   BLEDevice::deinit(true);
   delay(1000);
-  BLEDevice::init("RiseVBT_sensor");
+  BLEDevice::init("sheeeeeed");
 
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
@@ -106,59 +106,99 @@ void setup() {
   Serial.println("IMU and BLE ready");
 }
 
+void sendChunkedJson(const String &jsonString) {
+  const size_t chunkSize = 20;
+  size_t totalLength = jsonString.length();
+  size_t numChunks = (totalLength + chunkSize - 1) / chunkSize;
+
+  Serial.printf("📦 Sending JSON in %d chunks (total length %d)...\n", numChunks, totalLength);
+
+  for (size_t i = 0; i < numChunks; i++) {
+    String chunk = jsonString.substring(i * chunkSize, min((i + 1) * chunkSize, totalLength));
+    pDataCharacteristic->setValue(chunk.c_str());
+    pDataCharacteristic->notify();
+    vTaskDelay(pdMS_TO_TICKS(10));  // avoid overloading the BLE stack
+  }
+}
+
+// Kalman Filter class for smoothing
+class KalmanFilter {
+public:
+  KalmanFilter(float q = 1e-5, float r = 1e-2, float p = 1.0) : q(q), r(r), p(p), x(0.0) {}
+  float update(float measurement) {
+    p += q;
+    float k = p / (p + r);
+    x += k * (measurement - x);
+    p *= (1 - k);
+    return x;
+  }
+private:
+  float q, r, p, x;
+};
+
+KalmanFilter kalmanY;
+float velY = 0.0;
+
 void loop() {
-  // pinMode(LED_BUILTIN, OUTPUT);
-  // digitalWrite(LED_BUILTIN, deviceConnected ? HIGH : LOW);
-
-
-
-  Serial.print("🔄 deviceConnected: ");
-  Serial.print(deviceConnected);
-  Serial.print(" | sendData: ");
-  Serial.println(sendData);
-
   if (!deviceConnected || !sendData) {
     delay(100);
     return;
   }
 
-  Serial.println("📤 Sending IMU packet...");
+  Serial.println("📥 Collecting 3s of IMU data...");
 
-
-  imu::Vector<3> acc = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
-  imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-  imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-
-  static unsigned long packetTime = millis();
-
-  dt = (millis() - millisOld) / 1000.; 
-  millisOld = millis();
-
-  time1 = millisOld / 1000;
-
-  Vx = initVx + acc.x() * dt;
-  Vy = initVy + acc.y() * dt;
-  Vz = (initVz + acc.z() * dt) - 1;
-
-  StaticJsonDocument<512> doc;
-  doc["packet_time_stamp"] = packetTime;
+  StaticJsonDocument<1024> doc;
+  doc["packet_time_stamp"] = millis();
   doc["dir"] = direction;
 
-  JsonArray data = doc.createNestedArray("data");
+  JsonArray dataArray = doc.createNestedArray("data");
+  unsigned long start = millis();
 
-  JsonObject entry = data.createNestedObject();
-  entry["time_stamp"] = millis() / 1000.0;
-  entry["velocity"] = Vy;  // Replace with your velocity calculation if needed
-  entry["accel"] = acc.y();     // Use appropriate axis
-  entry["pitch"] = euler.y();
-  entry["yaw"] = euler.z();
+  while (millis() - start < 3000) {
+    imu::Vector<3> acc = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+    imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+
+    // Calculate dt
+    dt = (millis() - millisOld) / 1000.0;
+    millisOld = millis();
+
+    // Update velocity and apply Kalman filter
+    // Apply a low-pass threshold: if accel is very small, treat it as 0
+    float accY = abs(acc.y()) < 0.05 ? 0.0 : acc.y();
+
+    // Integrate velocity only when accel is significant
+    if (accY == 0.0) {
+      // Optional: gradual decay to zero (simulate friction)
+      velY *= 0.90;
+    } else {
+      velY += accY * dt;
+    }
+
+    // Kalman filter on velocity
+    float velY_filtered = kalmanY.update(velY);
+
+    // Optional hard clamp if velocity gets tiny
+    if (abs(velY_filtered) < 0.05) {
+      velY_filtered = 0.0;
+    }
+
+
+    // Only store significant motion data
+    if (abs(velY_filtered) >= 0.1) {
+      JsonObject entry = dataArray.createNestedObject();
+      entry["time_stamp"] = millis() / 1000.0;
+      entry["velocity"] = velY_filtered;
+      entry["accel"] = acc.y();
+      entry["pitch"] = euler.y();
+      entry["yaw"] = euler.z();
+    }
+
+    delay(50);  // ~20 Hz sampling
+  }
 
   String jsonString;
   serializeJson(doc, jsonString);
+  Serial.println("📤 Full JSON prepared. Sending...");
   Serial.println(jsonString);
-
-  pDataCharacteristic->setValue(jsonString.c_str());
-  pDataCharacteristic->notify();
-
-  delay(100);  // adjust based on desired sampling
+  sendChunkedJson(jsonString);
 }
