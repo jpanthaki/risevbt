@@ -35,7 +35,6 @@ final class DataModel {
     
     var reps: Int?
     var ratePerceivedExertion: Int?
-    var minVelocityThreshold: Double?
     
     
     init(packet: Packet) {

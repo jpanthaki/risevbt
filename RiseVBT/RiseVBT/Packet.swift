@@ -16,16 +16,16 @@ struct MetricData: Codable {
     let timeStamp: Double
     let velocity: Double
     let accel: Double
-//    let pitch: Double
-//    let yaw: Double
+    let pitch: Double
+    let yaw: Double
     
     
     enum CodingKeys: String, CodingKey {
         case timeStamp = "time_stamp"
         case velocity
         case accel
-//        case pitch
-//        case yaw
+        case pitch
+        case yaw
     }
 }
 
