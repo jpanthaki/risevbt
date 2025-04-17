@@ -26,23 +26,23 @@ struct HomeView: View {
                         RoundedRectangle(cornerRadius: 30)
                             .fill(Color.blue.opacity(0.4))
                         VStack {
-                            NavigationLink(destination: Page1View()) {
+                            NavigationLink(destination: RecordViewVid()) {
                                 RoundedRectangle(cornerRadius:20)
                                     .fill(Color.gray.opacity(0.4))
                                     .padding()
                                     .overlay(
-                                        Text("Record Video")
+                                        Text("Record w/ Video")
                                             .fontWeight(.heavy)
                                             .foregroundColor(.black.opacity(0.7))
                                             .font(.title)
                                     )
                             }
-                            NavigationLink(destination: RecordView()) {
+                            NavigationLink(destination: RecordViewNoVid()) {
                                 RoundedRectangle(cornerRadius:20)
                                     .fill(Color.gray.opacity(0.4))
                                     .padding()
                                     .overlay(
-                                        Text("Record Lift")
+                                        Text("Record w/o Video")
                                             .fontWeight(.heavy)
                                             .foregroundColor(.black.opacity(0.7))
                                             .font(.title)

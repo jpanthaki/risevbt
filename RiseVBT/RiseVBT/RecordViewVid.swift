@@ -1,17 +1,16 @@
 //
-//  RecordView.swift
+//  RecordViewVid.swift
 //  RiseVBT
 //
-//  Created by Jamshed Panthaki on 4/14/25.
+//  Created by Jamshed Panthaki on 4/17/25.
 //
 
 import SwiftUI
-import Charts
 
-
-struct RecordView : View {
+struct RecordViewVid: View {
     
     @StateObject var service = BluetoothService()
+    @StateObject private var recorder = Recorder()
     
     var body: some View {
         
@@ -22,8 +21,6 @@ struct RecordView : View {
                 Text(service.peripheralStatus.rawValue)
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .padding(.top, 30)
-                    .padding(.bottom, 30)
                 ZStack{
                     RoundedRectangle(cornerRadius: 30)
                         .fill(Color.blue.opacity(0.4))
@@ -35,7 +32,7 @@ struct RecordView : View {
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
                                 .foregroundColor(service.computedMCV ?? 0.0 > 0.5 ? Color.green : Color.red)
-                                
+                            
                             Text("m/s")
                                 .font(.title2)
                                 .fontWeight(.bold)
@@ -43,7 +40,19 @@ struct RecordView : View {
                     }
                     .padding()
                 }
-                .padding(.bottom, 10)
+                ZStack{
+                    //video frame
+                    RoundedRectangle(cornerRadius: 30)
+                        .fill(Color.blue.opacity(0.4))
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.gray.opacity(0.4))
+                        CameraPreview(session: $recorder.session)
+                            .padding()
+                    }
+                    .padding()
+                }
+                .frame(minHeight: 500)
                 ZStack {
                     RoundedRectangle(cornerRadius: 30)
                         .fill(Color.blue.opacity(0.4))
@@ -56,7 +65,7 @@ struct RecordView : View {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 20)
                                     .fill(Color.gray.opacity(0.4))
-                                Text("Start\nRecording")
+                                Text("Start")
                                     .font(.title)
                                     .fontWeight(.bold)
                                     .foregroundColor(Color.black)
@@ -70,7 +79,7 @@ struct RecordView : View {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 20)
                                     .fill(Color.gray.opacity(0.4))
-                                Text("Stop\nRecording")
+                                Text("Stop")
                                     .font(.title)
                                     .fontWeight(.bold)
                                     .foregroundColor(Color.black)
@@ -78,62 +87,6 @@ struct RecordView : View {
                         }
                     }
                     .padding()
-                }
-                .padding(.bottom, 10)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 30)
-                        .fill(Color.blue.opacity(0.4))
-                    Button {
-                        
-                    } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.gray.opacity(0.4))
-                            Text("Go to Analysis")
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(Color.black)
-                        }
-                    }
-                    .padding()
-                }
-                .padding(.bottom, 100)
-            }
-            .padding()
-        }
-        
-    }
-}
-
-struct RecordViewThatWorks: View {
-    @StateObject var service = BluetoothService()
-    
-    var body: some View {
-        
-        ZStack{
-            Color.blue.opacity(0.5)
-                .ignoresSafeArea()
-            VStack {
-                Text(service.peripheralStatus.rawValue)
-                    .font(.title)
-                
-                if service.peripheralStatus.rawValue == "connected" {
-                    //view
-                    VStack {
-                        Text("\(service.computedMCV ?? 0.0)")
-                        HStack {
-                            Button("StartButton") {
-                                service.sendStartCommand()
-                            }
-                            Button("StopButton") {
-                                service.sendStopCommand()
-                            }
-                        }
-                    }
-                    
-                    
-                } else {
-                    EmptyView()
                 }
             }
             .padding()
@@ -143,5 +96,5 @@ struct RecordViewThatWorks: View {
 }
 
 #Preview {
-    RecordView()
+    RecordViewVid()
 }
