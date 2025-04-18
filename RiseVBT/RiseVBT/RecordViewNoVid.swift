@@ -78,24 +78,24 @@ struct RecordViewNoVid : View {
                     .padding()
                 }
                 .padding(.bottom, 10)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 30)
-                        .fill(Color.blue.opacity(0.4))
-                    Button {
-                        
-                    } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.gray.opacity(0.4))
-                            Text("Go to Analysis")
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(Color.black)
-                        }
-                    }
-                    .padding()
-                }
-                .padding(.bottom, 100)
+//                ZStack {
+//                    RoundedRectangle(cornerRadius: 30)
+//                        .fill(Color.blue.opacity(0.4))
+//                    Button {
+//                        
+//                    } label: {
+//                        ZStack {
+//                            RoundedRectangle(cornerRadius: 20)
+//                                .fill(Color.gray.opacity(0.4))
+//                            Text("Go to Analysis")
+//                                .font(.title)
+//                                .fontWeight(.bold)
+//                                .foregroundColor(Color.black)
+//                        }
+//                    }
+//                    .padding()
+//                }
+//                .padding(.bottom, 100)
             }
             .padding()
         }

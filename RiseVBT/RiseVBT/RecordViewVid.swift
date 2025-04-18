@@ -9,8 +9,10 @@ import SwiftUI
 
 struct RecordViewVid: View {
     
-    @StateObject var service = BluetoothService()
+    @StateObject private var service = BluetoothService()
     @StateObject private var recorder = Recorder()
+    
+    @State private var showingAlert = false
     
     var body: some View {
         
@@ -59,7 +61,12 @@ struct RecordViewVid: View {
                     HStack {
                         Button {
                             if service.peripheralStatus.rawValue == "connected" {
-                                service.sendStartCommand()
+                                if !recorder.isRecording {
+                                    service.sendStartCommand()
+                                    recorder.startRecording()
+                                }
+                            } else {
+                                showingAlert = true
                             }
                         } label: {
                             ZStack {
@@ -71,9 +78,17 @@ struct RecordViewVid: View {
                                     .foregroundColor(Color.black)
                             }
                         }
+                        .alert("Connect a Device First", isPresented: $showingAlert) {
+                            Button("OK", role: .cancel) { }
+                        }
                         Button {
                             if service.peripheralStatus.rawValue == "connected" {
-                                service.sendStopCommand()
+                                if recorder.isRecording {
+                                    service.sendStopCommand()
+                                    recorder.stopRecording()
+                                }
+                            } else {
+                                showingAlert = true
                             }
                         } label: {
                             ZStack {
@@ -84,6 +99,9 @@ struct RecordViewVid: View {
                                     .fontWeight(.bold)
                                     .foregroundColor(Color.black)
                             }
+                        }
+                        .alert("Connect a Device First", isPresented: $showingAlert) {
+                            Button("OK", role: .cancel) { }
                         }
                     }
                     .padding()
