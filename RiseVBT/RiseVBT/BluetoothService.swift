@@ -30,7 +30,6 @@ class BluetoothService: NSObject, ObservableObject {
     
     @Published var peripheralStatus: ConnectionStatus = .disconnected
     @Published var packets: [Packet] = []
-//    @Published var currPacket: Data = Data()
     @Published var currPacket: String = ""
     @Published var computedMCV: Double?
     
@@ -148,34 +147,12 @@ extension BluetoothService: CBPeripheralDelegate {
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-//        let delimiter: UInt8 = 0x04
         
         if characteristic.uuid == dataCharacteristicUUID {
             guard let data = characteristic.value else {
                 print("No data received for \(characteristic.uuid.uuidString)")
                 return
             }
-//            print("received packet \(String(data: data, encoding: .utf8)!)")
-//            
-//            currPacket.append(data)
-//            
-//            while let idx = currPacket.firstIndex(of: delimiter) {
-//                let packetData = currPacket.subdata(in: 0..<idx)
-//                
-//                do {
-//                    let packet = try JSONDecoder().decode(Packet.self, from: packetData)
-//                    
-//                    currPacket.removeSubrange(0...idx)
-//                    
-//                    DispatchQueue.main.async {
-//                        self.packets.append(packet)
-//                        self.computedMCV = calcMCV(from: packet)
-//                    }
-//                    print("successfully built packet")
-//                } catch {
-//                    print("failed to decode json: \(error), \(String(data: currPacket, encoding: .utf8) ?? "no data")")
-//                }
-//            }
             
             do {
                 print("received packet \(String(data: data, encoding: .utf8)!)")

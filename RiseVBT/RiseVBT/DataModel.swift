@@ -27,17 +27,28 @@ enum WeightStandard: String, Codable, CaseIterable, Identifiable {
 final class DataModel {
     
     var id: UUID = UUID()
-    var packet: Packet
+    var packet: Packet?
     
-    var lift: LiftType?
-    var weight: Double?
-    var standard: WeightStandard?
+    var videoURL: URL?
     
-    var reps: Int?
-    var ratePerceivedExertion: Int?
+    var lift: LiftType
+    var weight: Double
+    var standard: WeightStandard
+    
+    var reps: Int
+    var rpe: Double
     
     
-    init(packet: Packet) {
+    init(packet: Packet? = nil, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
         self.packet = packet
+        self.lift = lift
+        self.weight = weight
+        self.standard = standard
+        self.reps = reps
+        self.rpe = rpe
+        
+        if videoURL != nil {
+            self.videoURL = videoURL
+        }
     }
 }
