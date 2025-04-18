@@ -24,11 +24,14 @@ class BluetoothService: NSObject, ObservableObject {
     
     private var centralManager: CBCentralManager!
     
+    private var shouldScanWhenReady: Bool = false
+    
     var myPeripheral: CBPeripheral?
 
     var commandCharacteristic: CBCharacteristic?
     
     @Published var peripheralStatus: ConnectionStatus = .disconnected
+    @Published var readyForCommand: Bool = false
     @Published var packets: [Packet] = []
     @Published var currPacket: String = ""
     @Published var computedMCV: Double?
@@ -39,8 +42,18 @@ class BluetoothService: NSObject, ObservableObject {
     }
     
     func scanForPeripherals() {
+        guard centralManager.state == .poweredOn else {
+            shouldScanWhenReady = true
+            return
+        }
         peripheralStatus = .scanning
         centralManager.scanForPeripherals(withServices: [myService])
+    }
+    
+    func prepareForSession() {
+        packets.removeAll()
+        currPacket = ""
+        computedMCV = nil
     }
 
     func sendStartCommand() {
@@ -108,6 +121,8 @@ extension BluetoothService: CBCentralManagerDelegate {
     
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: (any Error)?) {
         peripheralStatus = .disconnected
+        readyForCommand = false
+        scanForPeripherals()
     }
     
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: (any Error)?) {
@@ -118,6 +133,7 @@ extension BluetoothService: CBCentralManagerDelegate {
 
 extension BluetoothService: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        readyForCommand = false
         for service in peripheral.services ?? [] {
             if service.uuid == myService {
                 print("found service for \(myService)")
@@ -136,6 +152,12 @@ extension BluetoothService: CBPeripheralDelegate {
                 // Store the command characteristic for sending commands later.
                 self.commandCharacteristic = characteristic
                 print("Found command characteristic.")
+            }
+        }
+        
+        if commandCharacteristic != nil {
+            DispatchQueue.main.async {
+                self.readyForCommand = true
             }
         }
     }

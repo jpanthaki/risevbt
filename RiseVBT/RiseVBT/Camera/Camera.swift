@@ -11,28 +11,45 @@ import Photos
 import SwiftUI
 import UIKit
 
+
+final class PreviewView: UIView {
+    
+    override class var layerClass: AnyClass {
+        AVCaptureVideoPreviewLayer.self
+    }
+    
+    
+    var previewLayer: AVCaptureVideoPreviewLayer {
+        layer as! AVCaptureVideoPreviewLayer
+    }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        previewLayer.frame = bounds
+    }
+}
+
 struct CameraPreview: UIViewRepresentable {
     @Binding var session: AVCaptureSession
     
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
+    func makeUIView(context: Context) -> PreviewView {
+        let view = PreviewView()
+        view.previewLayer.videoGravity = .resizeAspectFill
         return view
     }
     
-    func updateUIView(_ uiView: UIView, context: Context) {
-        if let layer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            layer.session = session
-            layer.frame = uiView.bounds
-        }
+    func updateUIView(_ uiView: PreviewView, context: Context) {
+        uiView.previewLayer.session = session
     }
 }
 
 class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate, ObservableObject {
     @Published var session = AVCaptureSession() // session is now @Published
     @Published var isRecording = false
+    @Published var recordingURL: URL? = nil
+    
+    var onFinishedRecording: ((URL) -> Void)?
+    
     private let movieOutput = AVCaptureMovieFileOutput()
     
     override init() {
@@ -42,9 +59,16 @@ class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate, ObservableObject
         if session.canAddOutput(movieOutput) {
             session.addOutput(movieOutput)
         }
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.session.startRunning()
+    }
+    
+    func startSession() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.session.startRunning()
         }
+    }
+    
+    func stopSession() {
+        session.stopRunning()
     }
     
     private func addAudioInput() {
@@ -92,6 +116,10 @@ class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate, ObservableObject
         if let error = error {
             print("Error recording: \(error.localizedDescription)")
             return
+        }
+        
+        DispatchQueue.main.async {
+            self.onFinishedRecording?(outputFileURL)
         }
         
         // Save video to Photos

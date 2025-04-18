@@ -6,17 +6,17 @@ struct DataModelFormView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss)      private var dismiss
     
-    let packet: Packet?
+    let packets: [Packet]?
     
     @State private var lift: LiftType         = .Bench
     @State private var weight: Double         = 0
-    @State private var standard: WeightStandard = .lbs
+    @State private var standard: WeightStandard = .lb
     @State private var reps: Int              = 1
     @State private var rpe: Double            = 1
     @State private var videoURL: URL?
     
-    init(packet: Packet? = nil, videoURL: URL? = nil) {
-        self.packet = packet
+    init(packets: [Packet]? = nil, videoURL: URL? = nil) {
+        self.packets = packets
         // initialize the @State
         _videoURL = State(initialValue: videoURL)
     }
@@ -62,7 +62,7 @@ struct DataModelFormView: View {
                 Section {
                     Button("Save Lift") {
                         let newEntry = DataModel(
-                            packet:   packet ?? nil,
+                            packets:   packets ?? nil,
                             lift:     lift,
                             weight:   weight,
                             standard: standard,

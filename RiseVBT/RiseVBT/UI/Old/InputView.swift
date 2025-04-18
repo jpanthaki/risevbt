@@ -11,7 +11,7 @@ struct InputView: View {
     
     @State private var username: String = ""
     @State private var lift: LiftType = .Squat
-    @State private var standard: WeightStandard = .lbs
+    @State private var standard: WeightStandard = .lb
     @State private var weight: Double?
     @State private var reps: Int?
     @State private var rpe: Double?

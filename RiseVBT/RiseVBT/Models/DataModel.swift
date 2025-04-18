@@ -17,8 +17,8 @@ enum LiftType: String, Codable, CaseIterable, Identifiable {
 }
 
 enum WeightStandard: String, Codable, CaseIterable, Identifiable {
-    case lbs
-    case kgs
+    case lb
+    case kg
     
     var id: String { self.rawValue }
 }
@@ -27,7 +27,7 @@ enum WeightStandard: String, Codable, CaseIterable, Identifiable {
 final class DataModel {
     
     var id: UUID = UUID()
-    var packet: Packet?
+    var packets: [Packet]?
     
     var videoURL: URL?
     
@@ -39,8 +39,8 @@ final class DataModel {
     var rpe: Double
     
     
-    init(packet: Packet? = nil, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
-        self.packet = packet
+    init(packets: [Packet]? = nil, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
+        self.packets = packets
         self.lift = lift
         self.weight = weight
         self.standard = standard
