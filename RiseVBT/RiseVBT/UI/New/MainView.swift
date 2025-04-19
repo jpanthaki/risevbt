@@ -78,6 +78,13 @@ struct MainView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Text("\(service.peripheralStatus.rawValue)")
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingHelp = true
                     } label: {
