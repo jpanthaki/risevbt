@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct Theme {
     var accentColor: Color = .orange
@@ -17,13 +18,20 @@ struct Theme {
 struct ContentView: View {
     let theme = Theme()
     
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \DataModel.createdAt) private var entries: [DataModel]
+    
     @StateObject private var btService = BluetoothService()
     
     @State private var showBasicRecord = false
     @State private var showVideoRecord = false
+    @State private var showForm = false
+    @State private var showAnalysis = false
     
     @State private var packetArray: [Packet]?
     @State private var videoURL: URL?
+    
+    @State private var selectedModel: DataModel?
     
     var body: some View {
         NavigationStack {
@@ -32,11 +40,19 @@ struct ContentView: View {
                 navbarBackground: theme.navbarBackground,
                 backgroundColor: theme.backgroundColor,
                 preferDarkMode: theme.isDarkMode,
+                entries: entries,
                 onBasicRecord: {
                     showBasicRecord = true
                 },
                 onVideoRecord: {
                     showVideoRecord = true
+                },
+                onSelect: { model in
+                    selectedModel = model
+                    showAnalysis = true
+                },
+                onDelete: { model in
+                    modelContext.delete(model)
                 },
                 service: btService
             )
@@ -51,6 +67,10 @@ struct ContentView: View {
                 onStop: { packets, _ in
                     packetArray = packets
                     videoURL = nil
+                    showBasicRecord = false
+                    showForm = true
+                },
+                onCancel: {
                     showBasicRecord = false
                 },
                 service: btService
@@ -67,11 +87,31 @@ struct ContentView: View {
                 onStop: { packets, url in
                     packetArray = packets
                     videoURL = url
-                    print("GOT URL")
-                    print(videoURL ?? "bruh")
+                    showVideoRecord = false
+                    showForm = true
+                },
+                onCancel: {
                     showVideoRecord = false
                 },
                 service: btService
+            )
+            .interactiveDismissDisabled(true)
+        }
+        .fullScreenCover(isPresented: $showForm) {
+            FormView(
+                accentColor: theme.accentColor,
+                navbarBackground: theme.navbarBackground,
+                backgroundColor: theme.backgroundColor,
+                preferDarkMode: theme.isDarkMode,
+                packets: packetArray,
+                videoURL: videoURL,
+                onSave: { model in
+                    modelContext.insert(model)
+                    showForm = false
+                },
+                onCancel: {
+                    showForm = false
+                }
             )
             .interactiveDismissDisabled(true)
         }

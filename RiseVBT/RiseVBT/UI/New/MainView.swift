@@ -14,8 +14,13 @@ struct MainView: View {
     var backgroundColor: Color
     var preferDarkMode: Bool
     
+    var entries: [DataModel]
+    
     var onBasicRecord: () -> Void
     var onVideoRecord: () -> Void
+    
+    var onSelect: (DataModel) -> Void
+    var onDelete: (DataModel) -> Void
     
     @ObservedObject var service: BluetoothService
     
@@ -26,11 +31,33 @@ struct MainView: View {
             ZStack {
                 backgroundColor
                     .ignoresSafeArea()
-                //this is where the list of entries will go.
-                Text("No entries yet - tap + to record")
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding()
+                
+                if entries.isEmpty {
+                    Text("No entries yet – tap + to record")
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                } else {
+                    List {
+                        ForEach(entries) { model in
+                            Button {
+                                onSelect(model)
+                            } label: {
+                                HStack {
+                                    Text(model.lift.rawValue)
+                                    Spacer()
+                                    Text("\(model.weight, format: .number) \(model.standard.rawValue)")
+                                }
+                            }
+                        }
+                        .onDelete { indexSet in
+                            indexSet.forEach { index in
+                                onDelete(entries[index])
+                            }
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                }
             }
             .navigationTitle("RiseVBT")
             .navigationBarTitleDisplayMode(.inline)

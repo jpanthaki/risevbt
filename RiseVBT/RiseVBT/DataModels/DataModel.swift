@@ -25,11 +25,14 @@ enum WeightStandard: String, Codable, CaseIterable, Identifiable {
 
 @Model
 final class DataModel {
+    @Attribute(.unique) var id: UUID = UUID()
     
-    var id: UUID = UUID()
+    var createdAt: Date = Date()
+    
     var packets: [Packet]?
     
     var videoURL: URL?
+    var processedVideoURL: URL?
     
     var lift: LiftType
     var weight: Double
@@ -39,7 +42,7 @@ final class DataModel {
     var rpe: Double
     
     
-    init(packets: [Packet]? = nil, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
+    init(packets: [Packet]?, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
         self.packets = packets
         self.lift = lift
         self.weight = weight

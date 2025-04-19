@@ -18,6 +18,8 @@ struct RecordView: View {
     
     var onStop: ([Packet], URL?) -> Void
     
+    var onCancel: () -> Void
+    
     @ObservedObject var service: BluetoothService
     
     @StateObject private var recorder = Recorder()
@@ -112,6 +114,14 @@ struct RecordView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(navbarBackground, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            onCancel()
+                        }
+                        .disabled(isRecording)
+                    }
+                }
                 .tint(accentColor)
             }
         }

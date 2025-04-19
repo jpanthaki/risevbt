@@ -6,14 +6,19 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct RiseVBTApp: App {
 
     var body: some Scene {
         WindowGroup {
-//            HomeView()
             ContentView()
+                .modelContainer(
+                    for: [
+                        DataModel.self
+                    ]
+                )
         }
     }
 }
