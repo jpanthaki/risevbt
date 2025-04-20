@@ -166,28 +166,29 @@ void loop() {
     // Apply a low-pass threshold: if accel is very small, treat it as 0
     float accY = abs(acc.y()) < 0.05 ? 0.0 : acc.y();
 
+    // Kalman filter on acceleration
+    float accY_filtered = kalmanY.update(accY);
+
     // Integrate velocity only when accel is significant
-    if (accY == 0.0) {
+    if (accY_filtered == 0.0) {
       // Optional: gradual decay to zero (simulate friction)
       velY *= 0.90;
     } else {
-      velY += accY * dt;
+      velY += accY_filtered * dt;
     }
 
-    // Kalman filter on velocity
-    float velY_filtered = kalmanY.update(velY);
 
     // Optional hard clamp if velocity gets tiny
-    if (abs(velY_filtered) < 0.05) {
-      velY_filtered = 0.0;
+    if (abs(velY) < 0.05) {
+      velY = 0.0;
     }
 
 
     // Only store significant motion data
-    if (abs(velY_filtered) >= 0.1) {
+    if (abs(velY) >= 0.1) {
       JsonObject entry = dataArray.createNestedObject();
       entry["time_stamp"] = millis() / 1000.0;
-      entry["velocity"] = velY_filtered;
+      entry["velocity"] = velY;
       entry["accel"] = acc.y();
       entry["pitch"] = euler.y();
       entry["yaw"] = euler.z();
