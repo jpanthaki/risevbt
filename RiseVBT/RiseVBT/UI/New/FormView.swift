@@ -14,6 +14,7 @@ struct FormView: View {
     var preferDarkMode: Bool
     
     @State var packets: [Packet]?
+    @State var mcvValues: [Double]?
     @State var videoURL: URL?
     
     @State private var selectedLift: LiftType = .Bench
@@ -79,6 +80,7 @@ struct FormView: View {
                         Button("Save") {
                             let model = DataModel(
                                 packets: packets,
+                                mcvValues: mcvValues,
                                 lift: selectedLift,
                                 weight: weight,
                                 standard: selectedStandard,
@@ -107,6 +109,7 @@ struct FormView: View {
                         Button("Save") {
                             let model = DataModel(
                                 packets: packets,
+                                mcvValues: mcvValues,
                                 lift: selectedLift,
                                 weight: weight,
                                 standard: selectedStandard,

@@ -29,6 +29,7 @@ struct ContentView: View {
     @State private var showAnalysis = false
     
     @State private var packetArray: [Packet]?
+    @State private var mcvArray: [Double]?
     @State private var videoURL: URL?
     
     @State private var selectedModel: DataModel?
@@ -64,8 +65,9 @@ struct ContentView: View {
                 backgroundColor: theme.backgroundColor,
                 preferDarkMode: theme.isDarkMode,
                 videoOn: false,
-                onStop: { packets, _ in
+                onStop: { packets, mcvValues, _ in
                     packetArray = packets
+                    mcvArray = mcvValues
                     videoURL = nil
                     showBasicRecord = false
                     showForm = true
@@ -84,8 +86,9 @@ struct ContentView: View {
                 backgroundColor: theme.backgroundColor,
                 preferDarkMode: theme.isDarkMode,
                 videoOn: true,
-                onStop: { packets, url in
+                onStop: { packets, mcvValues, url in
                     packetArray = packets
+                    mcvArray = mcvValues
                     videoURL = url
                     showVideoRecord = false
                     showForm = true
@@ -104,6 +107,7 @@ struct ContentView: View {
                 backgroundColor: theme.backgroundColor,
                 preferDarkMode: theme.isDarkMode,
                 packets: packetArray,
+                mcvValues: mcvArray,
                 videoURL: videoURL,
                 onSave: { model in
                     modelContext.insert(model)

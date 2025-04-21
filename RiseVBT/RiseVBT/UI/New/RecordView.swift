@@ -16,7 +16,7 @@ struct RecordView: View {
     
     var videoOn: Bool = false
     
-    var onStop: ([Packet], URL?) -> Void
+    var onStop: ([Packet], [Double], URL?) -> Void
     
     var onCancel: () -> Void
     
@@ -79,12 +79,14 @@ struct RecordView: View {
                             if videoOn {
                                 recorder.onFinishedRecording = { url in
                                     let packets = service.packets
-                                    onStop(packets, url)
+                                    let mcvValues = service.mcvValues
+                                    onStop(packets, mcvValues, url)
                                 }
                                 recorder.stopRecording()
                             } else {
                                 let packets = service.packets
-                                onStop(packets, nil)
+                                let mcvValues = service.mcvValues
+                                onStop(packets, mcvValues, nil)
                             }
                         }
                         .font(.headline)

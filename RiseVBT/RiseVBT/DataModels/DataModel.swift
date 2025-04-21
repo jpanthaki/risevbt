@@ -31,6 +31,8 @@ final class DataModel {
     
     var packets: [Packet]?
     
+    var mcvValues: [Double]?
+    
     var videoURL: URL?
     var processedVideoURL: URL?
     
@@ -42,8 +44,9 @@ final class DataModel {
     var rpe: Double
     
     
-    init(packets: [Packet]?, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
+    init(packets: [Packet]?, mcvValues: [Double]?, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
         self.packets = packets
+        self.mcvValues = mcvValues
         self.lift = lift
         self.weight = weight
         self.standard = standard

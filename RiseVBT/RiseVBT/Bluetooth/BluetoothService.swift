@@ -18,6 +18,7 @@ enum ConnectionStatus: String {
 
 let myService: CBUUID = CBUUID(string: "7c961cfd-2527-4808-a9b0-9ce954427712")
 let dataCharacteristicUUID: CBUUID = CBUUID(string: "207a2a33-ab38-4748-8702-5ff50b2d673f")
+let meanCharacteristicUUID: CBUUID = CBUUID(string: "54a598af-dc7a-4398-be14-69e04c9b41ef")
 let commandCharacteristicUUID: CBUUID = CBUUID(string: "1c902c8d-88bb-44f9-9dea-0bc5bf2d0af4")
 
 class BluetoothService: NSObject, ObservableObject {
@@ -34,7 +35,9 @@ class BluetoothService: NSObject, ObservableObject {
     @Published var readyForCommand: Bool = false
     @Published var packets: [Packet] = []
     @Published var currPacket: String = ""
+    @Published var currData: Data = Data()
     @Published var computedMCV: Double?
+    @Published var mcvValues: [Double] = []
     
     override init() {
         super.init()
@@ -53,6 +56,7 @@ class BluetoothService: NSObject, ObservableObject {
     func prepareForSession() {
         packets.removeAll()
         currPacket = ""
+        currData = Data()
         computedMCV = nil
     }
 
@@ -145,9 +149,9 @@ extension BluetoothService: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         for characteristic in service.characteristics ?? [] {
             print("Discovered characteristic: \(characteristic.uuid.uuidString)")
-            if characteristic.uuid == dataCharacteristicUUID {
+            if characteristic.uuid == dataCharacteristicUUID || characteristic.uuid == meanCharacteristicUUID{
                 peripheral.setNotifyValue(true, for: characteristic)
-                print("Found data characteristic, waiting on values.")
+                print("Found data or mean characteristic, waiting on values.")
             } else if characteristic.uuid == commandCharacteristicUUID {
                 // Store the command characteristic for sending commands later.
                 self.commandCharacteristic = characteristic
@@ -176,28 +180,38 @@ extension BluetoothService: CBPeripheralDelegate {
                 return
             }
             
-            do {
-                print("received packet \(String(data: data, encoding: .utf8)!)")
-                
-                currPacket += String(data: data, encoding: .utf8)!
-                
-                //add data string to currPacket
-                //check if we can decode currPacket:
-                    //if yes: add to packets list, display the mcv, clear currPacket
-                    //if no: just return and wait for next packet
-                
-                let packet = try JSONDecoder().decode(Packet.self, from: currPacket.data(using: .utf8)!)
-                
-                DispatchQueue.main.async {
-                    self.currPacket = ""
-                    self.packets.append(packet)
-                    let mcv = calcMCV(from: packet)
-                    self.computedMCV = mcv
-                }
-                print("successfully built packet")
-            } catch {
-                print("Failed to decode JSON: \(error), \(currPacket)")
+            //one packet at a time for now
+            guard let packet = Packet(data: data) else {
+                print("error decoding packet")
+                return
             }
+            
+            DispatchQueue.main.async {
+                self.packets.append(packet)
+            }
+            
+        } else if characteristic.uuid == meanCharacteristicUUID {
+            guard let data = characteristic.value else {
+                print("No data received for \(characteristic.uuid.uuidString)")
+                return
+            }
+            
+            let rawMean: Float = data.withUnsafeBytes {
+                $0.load(as: Float.self)
+            }
+            
+            guard rawMean.isFinite else {
+                print("received non-finite mean")
+                return
+            }
+            
+            let mean = Double(rawMean)
+            
+            DispatchQueue.main.async {
+                self.computedMCV = mean
+                self.mcvValues.append(mean)
+            }
+            
         }
     }
 }
