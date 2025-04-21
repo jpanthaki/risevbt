@@ -24,6 +24,7 @@ float initVx, initVy, initVz = 0;
 unsigned long millisOld;
 unsigned long time1;
 float dt;
+unsigned long startTime = 0;
 
 // BLE
 BLECharacteristic* dataChar;
@@ -61,9 +62,11 @@ class MyCommandCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
     String value = pCharacteristic->getValue().c_str();
     if (value == "start") {
+      startTime = millis();
       sendData = true;
       Serial.println("✅ Start command received.");
     } else if (value == "stop") {
+      startTime = 0;
       sendData = false;
       Serial.println("🛑 Stop command received.");
     }
@@ -83,10 +86,14 @@ void samplingTask(void* parameter) {
       dt = (millis() - millisOld) / 1000.; 
       millisOld = millis();
       time1 = millisOld / 1000;
-      Vy = initVy + acc.y() * dt;
+      Vy = (initVy + acc.y() * dt);
+      if (abs(Vy) <= 0.1f) {
+        Vy = 0.0f;
+      }
 
-      pkt.dt_ms = SAMPLE_INTERVAL_MS;
-      pkt.velocity = Vy * 1000;  // scale velocity
+
+      pkt.dt_ms = (millis() - startTime);  // Time since 'start' command
+      pkt.velocity = Vy * 1000;
       pkt.accel = acc.y() * 100;
       pkt.pitch = euler.y() * 100;
       pkt.yaw = euler.z() * 100;
