@@ -1,8 +1,8 @@
 //
-//  DataModel.swift
+//  Models.swift
 //  RiseVBT
 //
-//  Created by Jamshed Panthaki on 4/15/25.
+//  Created by Jamshed Panthaki on 4/23/25.
 //
 
 import Foundation
@@ -30,6 +30,7 @@ final class DataModel {
     var createdAt: Date = Date()
     
     var packets: [Packet]?
+    //    var dataPoints: [DataPoint]?
     
     var mcvValues: [Double]?
     
@@ -44,8 +45,12 @@ final class DataModel {
     var rpe: Double
     
     
-    init(packets: [Packet]?, mcvValues: [Double]?, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL? = nil) {
-        self.packets = packets
+    init(packets: [Packet]?, mcvValues: [Double]?, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL?) {
+        
+        if let pkts = packets {
+            self.packets = pkts
+        }
+        
         self.mcvValues = mcvValues
         self.lift = lift
         self.weight = weight
@@ -53,8 +58,8 @@ final class DataModel {
         self.reps = reps
         self.rpe = rpe
         
-        if videoURL != nil {
-            self.videoURL = videoURL
+        if let url = videoURL {
+            self.videoURL = url
         }
     }
 }

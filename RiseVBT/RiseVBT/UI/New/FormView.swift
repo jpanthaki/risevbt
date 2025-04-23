@@ -130,5 +130,7 @@ struct FormView: View {
 }
 
 #Preview {
+    
+    
     FormView(accentColor: .orange, navbarBackground: .blue.opacity(0.5), backgroundColor: Color(UIColor.systemGroupedBackground), preferDarkMode: false, onSave: {model in print(model)}, onCancel: {})
 }
