@@ -1,4 +1,3 @@
-
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -8,19 +7,22 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <Wire.h>
+#include <EEPROM.h>
+#include <utility/imumaths.h>
 
 // UUIDs
-#define SERVICE_UUID           "7c961cfd-2527-4808-a9b0-9ce954427712"
-#define DATA_CHARACTERISTIC_UUID    "207a2a33-ab38-4748-8702-5ff50b2d673f"
-#define MCV_CHARACTERISTIC_UUID     "54a598af-dc7a-4398-be14-69e04c9b41ef"
+#define SERVICE_UUID "7c961cfd-2527-4808-a9b0-9ce954427712"
+#define DATA_CHARACTERISTIC_UUID "207a2a33-ab38-4748-8702-5ff50b2d673f"
+#define MCV_CHARACTERISTIC_UUID  "54a598af-dc7a-4398-be14-69e04c9b41ef"
 #define COMMAND_CHARACTERISTIC_UUID "1c902c8d-88bb-44f9-9dea-0bc5bf2d0af4"
 
 #define SAMPLE_INTERVAL_MS 50
 #define PACKET_QUEUE_LENGTH 10
-#define MCV_BUFFER_SIZE 120  // up to 6 seconds of samples at 20Hz
+#define MCV_BUFFER_SIZE 120
 
-// Sensor and BLE
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
+
+// BLE
 BLECharacteristic* dataChar;
 BLECharacteristic* mcvChar;
 BLECharacteristic* commandChar;
@@ -34,7 +36,14 @@ bool inConcentric = false;
 unsigned long startTime = 0;
 float previousAccY = 0.0;
 
-// Struct for IMU data
+// Calibration
+bool alreadyCalibrated = true;
+int eeAddress = 0;
+long bnoID;
+sensor_t sensor;
+uint8_t sys, gyroCal, accelCal, magCal;
+
+// Struct
 struct __attribute__((packed)) SensorPacket {
   uint16_t dt_ms;
   int16_t velocity;
@@ -48,7 +57,55 @@ float concentricVelocities[MCV_BUFFER_SIZE];
 uint32_t concentricTimestamps[MCV_BUFFER_SIZE];
 int concentricIndex = 0;
 
-// BLE Callbacks
+
+class KalmanFilter {
+public:
+  KalmanFilter(float q = 1e-5, float r = 1e-2, float p = 1.0) : q(q), r(r), p(p), x(0.0) {}
+  float update(float measurement) {
+    p += q;
+    float k = p / (p + r);
+    x += k * (measurement - x);
+    p *= (1 - k);
+    return x;
+  }
+private:
+  float q, r, p, x;
+};
+KalmanFilter kalmanAccY;
+
+
+
+// === Calibration ===
+void displaySensorOffsets(const adafruit_bno055_offsets_t &calibData) {
+  Serial.print("Accel Offset: ");
+  Serial.print(calibData.accel_offset_x); Serial.print(" ");
+  Serial.print(calibData.accel_offset_y); Serial.print(" ");
+  Serial.println(calibData.accel_offset_z);
+
+  Serial.print("Gyro Offset: ");
+  Serial.print(calibData.gyro_offset_x); Serial.print(" ");
+  Serial.print(calibData.gyro_offset_y); Serial.print(" ");
+  Serial.println(calibData.gyro_offset_z);
+
+  Serial.print("Mag Offset: ");
+  Serial.print(calibData.mag_offset_x); Serial.print(" ");
+  Serial.print(calibData.mag_offset_y); Serial.print(" ");
+  Serial.println(calibData.mag_offset_z);
+
+  Serial.print("Accel Radius: "); Serial.println(calibData.accel_radius);
+  Serial.print("Mag Radius: "); Serial.println(calibData.mag_radius);
+}
+
+void printCalibrationStatus() {
+  bno.getCalibration(&sys, &gyroCal, &accelCal, &magCal);
+  Serial.print("Calib Status -> Sys: ");
+  Serial.print(sys); Serial.print(" Accel: ");
+  Serial.print(accelCal); Serial.print(" Gyro: ");
+  Serial.print(gyroCal); Serial.print(" Mag: ");
+  Serial.println(magCal);
+}
+
+// === BLE Callbacks ===
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) { deviceConnected = true; }
   void onDisconnect(BLEServer* pServer) {
@@ -72,6 +129,7 @@ class MyCommandCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
+// === MCV ===
 float calculateMCV() {
   if (concentricIndex == 0) return 0.0;
   if (concentricIndex == 1) return concentricVelocities[0];
@@ -80,9 +138,7 @@ float calculateMCV() {
   uint32_t totalTime = concentricTimestamps[concentricIndex - 1] - concentricTimestamps[0];
   float arithmeticMean = 0.0;
 
-  for (int i = 0; i < concentricIndex; i++) {
-    arithmeticMean += concentricVelocities[i];
-  }
+  for (int i = 0; i < concentricIndex; i++) arithmeticMean += concentricVelocities[i];
   arithmeticMean /= concentricIndex;
 
   if (totalTime == 0) return arithmeticMean;
@@ -97,12 +153,12 @@ float calculateMCV() {
 
 void sendMCV(float mcv) {
   int16_t mcvScaled = mcv * 1000;
-  // mcvChar->setValue((uint8_t*)&mcvScaled, sizeof(mcvScaled));
-  mcvChar->setValue(mcv);
+  mcvChar->setValue((uint8_t*)&mcvScaled, sizeof(mcvScaled));
   mcvChar->notify();
-  Serial.printf("📤 Sent MCV: %.3f", mcv);
+  Serial.printf("📤 Sent MCV: %.3f\n", mcv);
 }
 
+// === Tasks ===
 void samplingTask(void* parameter) {
   SensorPacket pkt;
   uint32_t millisOld = millis();
@@ -115,7 +171,6 @@ void samplingTask(void* parameter) {
       float dt = (millis() - millisOld) / 1000.0;
       millisOld = millis();
       float Vy = acc.y() * dt;
-
       if (abs(Vy) < 0.1) Vy = 0.0;
 
       pkt.dt_ms = millis() - startTime;
@@ -124,94 +179,140 @@ void samplingTask(void* parameter) {
       pkt.pitch = euler.y() * 100;
       pkt.yaw = euler.z() * 100;
 
-      // Concentric phase detection
+      // Detect concentric phase
       if (acc.y() >= 0.05) {
         if (!inConcentric) {
-          concentricIndex = 0;  // reset buffer
+          concentricIndex = 0;
           inConcentric = true;
           Serial.println("🔄 Entered Concentric Phase");
         }
-
         if (concentricIndex < MCV_BUFFER_SIZE) {
           concentricVelocities[concentricIndex] = Vy;
           concentricTimestamps[concentricIndex] = millis();
           concentricIndex++;
         }
-
       } else if (acc.y() < -0.05 && inConcentric) {
         inConcentric = false;
-        Serial.println("⏹️ Switching to Eccentric Phase, sending MCV...");
-        float mcv = calculateMCV();
-        sendMCV(mcv);
-        concentricIndex = 0;
+        Serial.println("⏹️ Switched to Eccentric Phase");
+        sendMCV(calculateMCV());
       }
 
       xQueueSend(dataQueue, &pkt, portMAX_DELAY);
     }
-
     vTaskDelay(pdMS_TO_TICKS(SAMPLE_INTERVAL_MS));
   }
 }
 
 void bleTask(void* parameter) {
   SensorPacket pkt;
-
   while (true) {
     if (sendData && deviceConnected && xQueueReceive(dataQueue, &pkt, portMAX_DELAY)) {
       dataChar->setValue((uint8_t*)&pkt, sizeof(pkt));
       dataChar->notify();
-      Serial.printf("📤 Sent IMU | dt: %d ms | vel: %.3f | acc: %.2f | pitch: %.2f | yaw: %.2f",
-      pkt.dt_ms, pkt.velocity / 1000.0, pkt.accel / 100.0, pkt.pitch / 100.0, pkt.yaw / 100.0);
+      uint8_t sys, gyro, accel, mag;
+      bno.getCalibration(&sys, &gyro, &accel, &mag);
+      Serial.printf("📤 Sent IMU | dt: %d ms | vel: %.3f | acc: %.2f | pitch: %.2f | yaw: %.2f\n",
+        pkt.dt_ms, pkt.velocity / 1000.0, pkt.accel / 100.0,
+        pkt.pitch / 100.0, pkt.yaw / 100.0);
+      Serial.printf("📊 Calibration -> Sys: %d | Gyro: %d | Accel: %d | Mag: %d\n", sys, gyro, accel, mag);
+
     }
     vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
 
+#define EEPROM_SIZE 512
+#define MAGIC_KEY 0xA55A1234  // Used to verify EEPROM content is valid
+
+// === Setup ===
 void setup() {
   Serial.begin(115200);
-  while (!Serial);
-  Serial.println("Booting...");
+  delay(1000);
+  EEPROM.begin(EEPROM_SIZE);
+  Serial.println("🌀 Booting...");
 
   if (!bno.begin()) {
-    Serial.println("BNO055 not detected!");
+    Serial.println("❌ BNO055 not detected!");
     while (1);
   }
+  delay(1000);
+
+  long magic = 0;
+  EEPROM.get(0, magic);
+
+  if (magic == MAGIC_KEY) {
+    EEPROM.get(sizeof(long), bnoID);
+    bno.getSensor(&sensor);
+
+    Serial.printf("🔍 EEPROM bnoID: %ld | Sensor ID: %ld\n", bnoID, sensor.sensor_id);
+
+    if (bnoID == sensor.sensor_id) {
+      Serial.println("🔁 Restoring calibration from EEPROM...");
+      adafruit_bno055_offsets_t calib;
+      EEPROM.get(sizeof(long) * 2, calib);
+
+      bno.setMode(OPERATION_MODE_CONFIG);
+      delay(25);
+      bno.setSensorOffsets(calib);
+      bno.setMode(OPERATION_MODE_NDOF);
+      delay(25);
+      displaySensorOffsets(calib);
+      Serial.println("✅ Calibration restored successfully!");
+    } else {
+      Serial.println("⚠️ Sensor ID mismatch. Skipping calibration restore.");
+    }
+  } else {
+    Serial.println("🧭 Calibrating...");
+    while (!bno.isFullyCalibrated()) {
+      printCalibrationStatus();
+      delay(100);
+    }
+
+    adafruit_bno055_offsets_t calib;
+    bno.setMode(OPERATION_MODE_CONFIG);
+    delay(25);
+    bno.getSensorOffsets(calib);
+    bno.getSensor(&sensor);
+    bnoID = sensor.sensor_id;
+
+    EEPROM.put(0, MAGIC_KEY);
+    EEPROM.put(sizeof(long), bnoID);
+    EEPROM.put(sizeof(long) * 2, calib);
+    EEPROM.commit();
+
+    bno.setMode(OPERATION_MODE_NDOF);
+    delay(25);
+    Serial.println("✅ Calibration saved to EEPROM!");
+    displaySensorOffsets(calib);
+  }
+
   bno.setExtCrystalUse(true);
 
+  // === BLE Setup (unchanged)
   BLEDevice::init("sheeeeeed");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService* pService = pServer->createService(SERVICE_UUID);
 
-  dataChar = pService->createCharacteristic(
-    DATA_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_NOTIFY
-  );
+  dataChar = pService->createCharacteristic(DATA_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_NOTIFY);
   dataChar->addDescriptor(new BLE2902());
 
-  mcvChar = pService->createCharacteristic(
-    MCV_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_NOTIFY
-  );
+  mcvChar = pService->createCharacteristic(MCV_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_NOTIFY);
   mcvChar->addDescriptor(new BLE2902());
 
-  commandChar = pService->createCharacteristic(
-    COMMAND_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_WRITE
-  );
+  commandChar = pService->createCharacteristic(COMMAND_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_WRITE);
   commandChar->setCallbacks(new MyCommandCallbacks());
 
   pService->start();
-
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   BLEDevice::startAdvertising();
 
-  Serial.println("✅ BLE Advertising started...");
+  Serial.println("📡 BLE Advertising...");
 
   dataQueue = xQueueCreate(PACKET_QUEUE_LENGTH, sizeof(SensorPacket));
-  if (dataQueue == NULL) {
+  if (!dataQueue) {
     Serial.println("❌ Queue creation failed.");
     while (1);
   }
