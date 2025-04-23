@@ -37,6 +37,8 @@ struct AnalysisView: View {
                 backgroundColor.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 24) {
+                        //video goes here if it's there
+                        
                         //chart here
                         Chart(dataPoints) { p in
                             LineMark(
@@ -57,7 +59,7 @@ struct AnalysisView: View {
                         .padding()
                         .background(RoundedRectangle(cornerRadius: 12).fill(.white).shadow(radius: 4))
                         
-                        Button ("View Video Footage") {
+                        Button ("View Bar Path Analysis") {
                             //play footage here
                         }
                         .frame(maxWidth: .infinity, minHeight: 44)

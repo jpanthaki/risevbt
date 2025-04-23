@@ -60,11 +60,19 @@ struct RecordView: View {
                     
                     HStack(spacing: 40) {
                         Button("Start") {
-                            isRecording = true
-                            service.sendStartCommand()
                             if videoOn {
-                                recorder.startRecording()
+                                do {
+                                    try recorder.startRecording()
+                                    isRecording = true
+                                    service.sendStartCommand()
+                                } catch {
+                                    print("recording failed for some reason", error)
+                                }
+                            } else {
+                                isRecording = true
+                                service.sendStartCommand()
                             }
+                            
                         }
                         .font(.headline)
                         .frame(width: 100, height: 44)

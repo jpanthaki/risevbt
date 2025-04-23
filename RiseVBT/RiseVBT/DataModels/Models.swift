@@ -30,7 +30,6 @@ final class DataModel {
     var createdAt: Date = Date()
     
     var packets: [Packet]?
-    //    var dataPoints: [DataPoint]?
     
     var mcvValues: [Double]?
     
@@ -60,6 +59,26 @@ final class DataModel {
         
         if let url = videoURL {
             self.videoURL = url
+        }
+    }
+    
+    @MainActor
+    func getBarPathOverlay() async -> URL? {
+        if let url = self.processedVideoURL {
+            return url
+        } else {
+            if let url = self.videoURL {
+                if let outputURL = await processVideo(url: url) {
+                    self.processedVideoURL = outputURL
+                    return outputURL
+                } else {
+                    print("tracking failed")
+                    return nil
+                }
+            } else {
+                print("no url provided")
+                return nil
+            }
         }
     }
 }

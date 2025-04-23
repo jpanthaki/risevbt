@@ -87,8 +87,8 @@ class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate, ObservableObject
         }
     }
     
-    func startRecording() {
-        guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("video.mp4") else { return }
+    func startRecording() throws {
+        let url = try makeNewVideoURL()
         if movieOutput.isRecording == false {
             if FileManager.default.fileExists(atPath: url.path) {
                 try? FileManager.default.removeItem(at: url)
