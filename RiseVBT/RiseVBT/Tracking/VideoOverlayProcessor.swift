@@ -87,7 +87,6 @@ public struct VideoOverlayProcessor {
         }
     }
     
-    /// Creates a handler that draws both bounding boxes and the connecting path.
     public static func makeBoxAndPathHandler(
         boxes: [CGRect],
         boxColor: CGColor,

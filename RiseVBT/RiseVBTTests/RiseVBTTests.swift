@@ -17,7 +17,7 @@ final class PacketInitializerTests: XCTestCase {
         var raw = Data()
         raw.append(UInt32(150).littleEndianData)    // timeMs = 150 ms
         raw.append(Int16(823).littleEndianData)     // velocity = 0.823 m/s
-        raw.append(Int16(-350).littleEndianData)    // accel = -3.50 m/s²
+        raw.append(Int16(-350).littleEndianData)    // accel = -3.50 m/s2
         raw.append(Int16(7425).littleEndianData)    // pitch = 74.25°
         raw.append(Int16(-16072).littleEndianData)  // yaw = -160.72°
         

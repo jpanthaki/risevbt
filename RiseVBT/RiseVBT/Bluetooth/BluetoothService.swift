@@ -141,7 +141,7 @@ extension BluetoothService: CBPeripheralDelegate {
         for service in peripheral.services ?? [] {
             if service.uuid == myService {
                 print("found service for \(myService)")
-                peripheral.discoverCharacteristics([dataCharacteristicUUID, commandCharacteristicUUID], for: service)
+                peripheral.discoverCharacteristics([dataCharacteristicUUID, commandCharacteristicUUID, meanCharacteristicUUID], for: service)
             }
         }
     }
