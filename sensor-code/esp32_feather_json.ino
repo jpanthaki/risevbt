@@ -57,6 +57,63 @@ float concentricVelocities[MCV_BUFFER_SIZE];
 uint32_t concentricTimestamps[MCV_BUFFER_SIZE];
 int concentricIndex = 0;
 
+class Kalman1D {
+public:
+  float v;      // velocity estimate
+  float a;      // acceleration estimate
+  float dt;
+
+  float x[2];   // state vector [v, a]
+  float P[2][2];
+
+  float Q[2][2];  // process noise
+  float R;        // measurement noise
+
+  Kalman1D(float dt_) : dt(dt_) {
+    x[0] = 0.0; x[1] = 0.0; // initial velocity, acceleration
+    P[0][0] = 1.0; P[0][1] = 0.0;
+    P[1][0] = 0.0; P[1][1] = 1.0;
+
+    Q[0][0] = 1e-4; Q[0][1] = 0.0;
+    Q[1][0] = 0.0;  Q[1][1] = 1e-4;
+    R = 0.01;
+  }
+
+  void update(float measured_accel) {
+    // Prediction step
+    x[0] += x[1] * dt;  // v = v + a*dt
+    x[1] = x[1];        // acceleration remains
+
+    P[0][0] += dt * (P[1][1] * dt + P[0][1] + P[1][0]) + Q[0][0];
+    P[0][1] += dt * P[1][1];
+    P[1][0] += dt * P[1][1];
+    P[1][1] += Q[1][1];
+
+    // Measurement update (only a)
+    float y = measured_accel - x[1]; // residual
+    float S = P[1][1] + R;
+    float K0 = P[0][1] / S;
+    float K1 = P[1][1] / S;
+
+    x[0] += K0 * y;
+    x[1] += K1 * y;
+
+    // Update P
+    float P00_temp = P[0][0];
+    float P01_temp = P[0][1];
+
+    P[0][0] -= K0 * P01_temp;
+    P[0][1] -= K0 * P[1][1];
+    P[1][0] -= K1 * P01_temp;
+    P[1][1] -= K1 * P[1][1];
+
+    v = x[0];
+    a = x[1];
+  }
+
+  float getVelocity() { return v; }
+  float getAcceleration() { return a; }
+};
 
 class KalmanFilter {
 public:
@@ -170,12 +227,21 @@ void samplingTask(void* parameter) {
 
       float dt = (millis() - millisOld) / 1000.0;
       millisOld = millis();
-      float Vy = acc.y() * dt;
-      if (abs(Vy) < 0.1) Vy = 0.0;
+      float rawAccY = acc.y();
+      float filteredAccY = kalmanAccY.update(rawAccY);
+
+      // Then integrate
+      float Vy = kalmanAccY.update(acc.y() * dt);
+      if (abs(Vy) < 0.08) Vy = 0.0;
+
+
+      // // Clamp near-zero velocities
+      // if (abs(Vy) < 0.05) Vy = 0.0;
+
 
       pkt.dt_ms = millis() - startTime;
       pkt.velocity = Vy * 1000;
-      pkt.accel = acc.y() * 100;
+      pkt.accel = filteredAccY * 100;
       pkt.pitch = euler.y() * 100;
       pkt.yaw = euler.z() * 100;
 
@@ -220,6 +286,7 @@ void bleTask(void* parameter) {
     vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
+
 
 #define EEPROM_SIZE 512
 #define MAGIC_KEY 0xA55A1234  // Used to verify EEPROM content is valid
