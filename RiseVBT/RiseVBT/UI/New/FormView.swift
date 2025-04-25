@@ -16,6 +16,7 @@ struct FormView: View {
     @State var packets: [Packet]?
     @State var mcvValues: [Double]?
     @State var videoURL: URL?
+    @State var processedVideoURL: URL?
     
     @State private var selectedLift: LiftType = .Bench
     @State private var weight: Double = 0.0
@@ -67,12 +68,21 @@ struct FormView: View {
                     
                     // Media section
                     Section("Media") {
-                        HStack {
-                            Text("Video")
-                            Spacer()
-                            Text(videoURL?.lastPathComponent ?? "None")
-                                .foregroundColor(.secondary)
+                        VStack {
+                            HStack {
+                                Text("Original Video")
+                                Spacer()
+                                Text(videoURL?.lastPathComponent ?? "None")
+                                    .foregroundColor(.secondary)
+                            }
+                            HStack {
+                                Text("Bar Path Overlay")
+                                Spacer()
+                                Text(processedVideoURL?.lastPathComponent ?? "Processing...")
+                                    .foregroundColor(.secondary)
+                            }
                         }
+                        
                     }
                     
                     // Save section
@@ -123,6 +133,24 @@ struct FormView: View {
                     }
                 }
                 .tint(accentColor)
+            }
+        }
+        .onAppear {
+            Task {
+                guard let inputURL = videoURL else {
+                    return
+                }
+                do {
+                    let outputURL = try makeNewVideoURL()
+                    
+                    if let resultURL = await processVideo(inputURL: inputURL, outputURL: outputURL) {
+                        processedVideoURL = resultURL
+                    } else {
+                        print("tracking failed")
+                    }
+                } catch {
+                    print("Failed to create output URL:", error)
+                }
             }
         }
         .preferredColorScheme(preferDarkMode ? .dark : .light)

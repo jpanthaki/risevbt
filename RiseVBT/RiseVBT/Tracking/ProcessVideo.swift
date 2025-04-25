@@ -10,18 +10,9 @@ import AVFoundation
 import Vision
 import CoreGraphics
 
-func processVideo(url: URL) async -> URL? {
+func processVideo(inputURL: URL, outputURL: URL) async -> URL? {
     
-    let asset = AVURLAsset(url: url)
-    
-    let outputURL: URL
-    
-    do {
-        outputURL = try makeNewVideoURL()
-    } catch {
-        print("failed to create output url", error)
-        return nil
-    }
+    let asset = AVURLAsset(url: inputURL)
     
     let processor: TrackerProcessor
     do {
@@ -46,7 +37,7 @@ func processVideo(url: URL) async -> URL? {
     
     do {
         let _ = try await overlayProcessor.process(
-            inputURL: url,
+            inputURL: inputURL,
             outputURL: outputURL,
             overlayHandler: lineHandler,
         )

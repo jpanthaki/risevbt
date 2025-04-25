@@ -61,24 +61,4 @@ final class DataModel {
             self.videoURL = url
         }
     }
-    
-    @MainActor
-    func getBarPathOverlay() async -> URL? {
-        if let url = self.processedVideoURL {
-            return url
-        } else {
-            if let url = self.videoURL {
-                if let outputURL = await processVideo(url: url) {
-                    self.processedVideoURL = outputURL
-                    return outputURL
-                } else {
-                    print("tracking failed")
-                    return nil
-                }
-            } else {
-                print("no url provided")
-                return nil
-            }
-        }
-    }
 }

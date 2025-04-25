@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Charts
+import AVKit
 
 struct DataPoint: Identifiable {
     let id = UUID()
@@ -38,6 +39,10 @@ struct AnalysisView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         //video goes here if it's there
+                        if let url = model.processedVideoURL {
+                            VideoPlayer(player: AVPlayer(url: url))
+                                .frame(height: 300)
+                        }
                         
                         //chart here
                         Chart(dataPoints) { p in

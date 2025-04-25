@@ -48,3 +48,34 @@ private extension Int16 {
         return Data(bytes: &le, count: MemoryLayout<Int16>.size)
     }
 }
+
+final class ObjectTrackingTests: XCTestCase {
+    let bundle = Bundle(for: ObjectTrackingTests.self)
+    
+    func testTrackerFromVideo1() {
+        guard let inputUrl = bundle.url(forResource: "sample1", withExtension: "mov") else {
+            XCTFail("sample1.mov not found in test bundle")
+            return
+        }
+        
+        
+    }
+    
+    func testTrackerFromVideo2() {
+        guard let inputUrl = bundle.url(forResource: "sample2", withExtension: "mp3") else {
+            XCTFail("sample2.mp4 not found in test bundle")
+            return
+        }
+        
+        
+    }
+    
+    func testTrackerFromVideo3() {
+        guard let inputUrl = bundle.url(forResource: "sample3", withExtension: "mp3") else {
+            XCTFail("sample3.mp4 not found in test bundle")
+            return
+        }
+    }
+    
+    
+}
