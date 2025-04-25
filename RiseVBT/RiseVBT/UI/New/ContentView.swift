@@ -119,6 +119,18 @@ struct ContentView: View {
             )
             .interactiveDismissDisabled(true)
         }
+        .fullScreenCover(isPresented: $showAnalysis) {
+            AnalysisView(
+                accentColor: theme.accentColor,
+                navbarBackground: theme.navbarBackground,
+                backgroundColor: theme.backgroundColor,
+                preferDarkMode: theme.isDarkMode,
+                model: selectedModel!,
+                onClose: {
+                    showAnalysis = false
+                }
+            )
+        }
     }
 }
 

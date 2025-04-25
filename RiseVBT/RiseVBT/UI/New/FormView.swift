@@ -7,6 +7,31 @@
 
 import SwiftUI
 
+@MainActor class FormViewModel: ObservableObject {
+    @Published var processedVideoURL: URL?
+    @Published var errorText: String? = nil
+    
+    func getVideo(videoURL: URL?, onFinish: () -> Void) {
+        Task {
+            guard let inputURL = videoURL else {
+                errorText = "No video provided"
+                return
+            }
+            do {
+                let outputURL = try makeNewVideoURL()
+                
+                if let resultURL = await processVideo(inputURL: inputURL, outputURL: outputURL) {
+                    processedVideoURL = resultURL
+                } else {
+                    errorText = "Tracking Failed"
+                }
+            } catch {
+                errorText = "Failed to create output URL: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
 struct FormView: View {
     var accentColor: Color
     var navbarBackground: Color
@@ -26,6 +51,8 @@ struct FormView: View {
     
     var onSave: (DataModel) -> Void
     var onCancel: () -> Void
+    
+    @ObservedObject var viewModel = FormViewModel()
     
     var body: some View {
         NavigationStack {
@@ -136,22 +163,12 @@ struct FormView: View {
             }
         }
         .onAppear {
-            Task {
-                guard let inputURL = videoURL else {
-                    return
+            viewModel.getVideo(
+                videoURL: videoURL,
+                onFinish: {
+                    processedVideoURL = viewModel.processedVideoURL
                 }
-                do {
-                    let outputURL = try makeNewVideoURL()
-                    
-                    if let resultURL = await processVideo(inputURL: inputURL, outputURL: outputURL) {
-                        processedVideoURL = resultURL
-                    } else {
-                        print("tracking failed")
-                    }
-                } catch {
-                    print("Failed to create output URL:", error)
-                }
-            }
+            )
         }
         .preferredColorScheme(preferDarkMode ? .dark : .light)
     }

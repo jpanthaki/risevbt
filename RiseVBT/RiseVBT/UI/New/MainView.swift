@@ -43,10 +43,17 @@ struct MainView: View {
                             Button {
                                 onSelect(model)
                             } label: {
-                                HStack {
-                                    Text(model.lift.rawValue)
-                                    Spacer()
-                                    Text("\(model.weight, format: .number) \(model.standard.rawValue)")
+                                VStack {
+                                    HStack {
+                                        Text(model.createdAt)
+                                        Spacer()
+                                        Text(model.lift.rawValue)
+                                    }
+                                    HStack {
+                                        Text("\(model.weight, format: .number) \(model.standard.rawValue)")
+                                        Spacer()
+                                        Text("\(model.rpe, format: .number)")
+                                    }
                                 }
                             }
                         }
