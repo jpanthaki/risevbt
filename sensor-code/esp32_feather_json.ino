@@ -210,7 +210,7 @@ float calculateMCV() {
 
 void sendMCV(float mcv) {
   int16_t mcvScaled = mcv * 1000;
-  mcvChar->setValue((uint8_t*)&mcvScaled, sizeof(mcvScaled));
+  mcvChar->setValue(mcv);
   mcvChar->notify();
   Serial.printf("📤 Sent MCV: %.3f\n", mcv);
 }
