@@ -182,7 +182,7 @@ extension BluetoothService: CBPeripheralDelegate {
             
             //one packet at a time for now
             guard let packet = Packet(data: data) else {
-                print("error decoding packet")
+                print("error decoding packet", data.count)
                 return
             }
             
@@ -195,6 +195,8 @@ extension BluetoothService: CBPeripheralDelegate {
                 print("No data received for \(characteristic.uuid.uuidString)")
                 return
             }
+            
+            print(data.count)
             
             let rawMean: Float = data.withUnsafeBytes {
                 $0.load(as: Float.self)

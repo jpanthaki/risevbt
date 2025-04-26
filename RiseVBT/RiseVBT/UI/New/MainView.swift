@@ -45,7 +45,7 @@ struct MainView: View {
                             } label: {
                                 VStack {
                                     HStack {
-                                        Text(model.createdAt)
+                                        Text(model.createdAt, style: .date)
                                         Spacer()
                                         Text(model.lift.rawValue)
                                     }

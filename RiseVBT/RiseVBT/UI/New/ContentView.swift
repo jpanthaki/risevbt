@@ -50,6 +50,7 @@ struct ContentView: View {
                 },
                 onSelect: { model in
                     selectedModel = model
+                    print(selectedModel?.lift.rawValue ?? "NONE")
                     showAnalysis = true
                 },
                 onDelete: { model in
@@ -119,15 +120,16 @@ struct ContentView: View {
             )
             .interactiveDismissDisabled(true)
         }
-        .fullScreenCover(isPresented: $showAnalysis) {
+        .fullScreenCover(item: $selectedModel) { model in
             AnalysisView(
                 accentColor: theme.accentColor,
                 navbarBackground: theme.navbarBackground,
                 backgroundColor: theme.backgroundColor,
                 preferDarkMode: theme.isDarkMode,
-                model: selectedModel!,
+                model: model,
                 onClose: {
                     showAnalysis = false
+                    selectedModel = nil
                 }
             )
         }

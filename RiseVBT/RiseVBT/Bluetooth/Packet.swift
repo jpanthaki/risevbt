@@ -9,13 +9,13 @@ import Foundation
 
 struct Packet: Codable {
     
-    let timeMs: UInt32
+    let timeMs: UInt16
     let velocity: Int16
     let accel: Int16
     let pitch: Int16
     let yaw: Int16
     
-    static let byteSize = MemoryLayout<UInt32>.size + 4 * MemoryLayout<Int16>.size
+    static let byteSize = MemoryLayout<UInt16>.size + 4 * MemoryLayout<Int16>.size
     
     init?(data: Data) {
         guard data.count == Packet.byteSize else {
@@ -27,7 +27,7 @@ struct Packet: Codable {
     private init(from data: Data, offset: Int) {
         timeMs = data.withUnsafeBytes{ ptr in
             let base = ptr.baseAddress!.advanced(by: offset)
-            return UInt32(littleEndian: base.assumingMemoryBound(to: UInt32.self).pointee)
+            return UInt16(littleEndian: base.assumingMemoryBound(to: UInt16.self).pointee)
         }
         
         let base = data.withUnsafeBytes { ptr in ptr.baseAddress!.advanced(by: offset + 4) }
