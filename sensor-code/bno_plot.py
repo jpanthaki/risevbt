@@ -1,6 +1,7 @@
 import asyncio
 import threading
 import matplotlib
+import math
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -13,14 +14,19 @@ import csv
 import tkinter as tk
 from tkinter import ttk
 import matplotlib.backends.backend_tkagg as tkagg
+import json
+
+json_filename = "imu_log.json"
+logfile = open(json_filename, "a")  # append mode
 
 # === CONFIG ===
-DEVICE_NAME = "JAMSHED_P"
-CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+DEVICE_NAME = "sheeeeeed"
+CHARACTERISTIC_UUID = "207a2a33-ab38-4748-8702-5ff50b2d673f"
+COMMAND_CHARACTERISTIC_UUID = "1c902c8d-88bb-44f9-9dea-0bc5bf2d0af4"
 buffer_size = 100
 smooth_window = 5
 USE_SMOOTHING = True
-csv_filename = "imu_log.csv"
+# csv_filename = "imu_log.csv"
 
 # === Smoothing ===
 def moving_average(data, window):
@@ -65,14 +71,14 @@ kalman = {
 
 recording = True
 lock = threading.Lock()
-logfile = open(csv_filename, "w", newline="")
-writer = csv.writer(logfile)
-writer.writerow([
-    "Time", "Acc X", "Acc Y", "Acc Z",
-    "Gyro X", "Gyro Y", "Gyro Z",
-    "Euler X", "Euler Y", "Euler Z",
-    "Calib Sys", "Calib Gyro", "Calib Accel", "Calib Mag"
-])
+# logfile = open(csv_filename, "w", newline="")
+# writer = csv.writer(logfile)
+# writer.writerow([
+#     "Time", "Acc X", "Acc Y", "Acc Z",
+#     "Gyro X", "Gyro Y", "Gyro Z",
+#     "Euler X", "Euler Y", "Euler Z",
+#     "Calib Sys", "Calib Gyro", "Calib Accel", "Calib Mag"
+# ])
 
 # === BLE Notification Handler ===
 # === BLE Notification Handler ===
@@ -83,74 +89,54 @@ alpha = 0.5  # Low-pass filter coefficient (0 = smoothest, 1 = raw)
 # Previous raw acceleration for filtering
 acc_prev = [0.0, 0.0, 0.0]
 
+# === BLE Notification Handler ===
+last_time = None
+
+import struct
+
 def notification_handler(sender, data):
-    global recording, last_time, vel
+    try:
+        if len(data) != 10:
+            print(f"❌ Unexpected packet size: {len(data)} bytes")
+            return
 
-    line = data.decode().strip()
-    print(f"\n🔵 RAW: '{line}'")
+        dt_ms, velocity_raw, accel_raw, pitch_raw, yaw_raw = struct.unpack("<Hhhhh", data)
 
-    match = re.search(
-        r"LinAcc X:(-?\d+\.\d+)LinAcc Y:(-?\d+\.\d+)LinAcc Z:(-?\d+\.\d+);"
-        r"Gyro X:(-?\d+\.\d+)Gyro Y:(-?\d+\.\d+)Gyro Z:(-?\d+\.\d+);"
-        r"Roll \(Euler X\):(-?\d+\.\d+)Pitch \(Euler Y\):(-?\d+\.\d+)Yaw \(Euler Z\):(-?\d+\.\d+);"
-        r"Calib Sys:(\d+) Gyro:(\d+) Accel:(\d+) Mag:(\d+);"
-        r"Vx:(-?\d+\.\d+)Vy:(-?\d+\.\d+)Vz:(-?\d+\.\d+)",
-        line
-    )
+        velocity = velocity_raw / 1000.0
+        accel = accel_raw / 100.0
+        pitch = pitch_raw / 100.0
+        yaw = yaw_raw / 100.0
 
-    if match:
-        now = datetime.now()
-        if last_time is None:
-            last_time = now
-
-        dt = (now - last_time).total_seconds()
-        last_time = now
-
-        vals = [float(match.group(i)) for i in range(1, 10)]
-        calib = [int(match.group(i)) for i in range(10, 14)]
-
-        acc = vals[0:3]
-        gyro = vals[3:6]
-
-        # === Low-pass filter and clamping ===
-        # === Low-pass filter and clamping ===
-        alpha = 0.5
-        acc_filtered = [alpha * a + (1 - alpha) * v for a, v in zip(acc, vel)]
-        acc_clamped = [0.0 if abs(a) < 0.10 else a for a in acc_filtered]
-
-        # Integrate to velocity
-        new_vel = [v + a * dt for v, a in zip(vel, acc_clamped)]
-
-        # Apply Kalman filter to velocity
-        vel[0] = kalman["vel_x"].update(new_vel[0])
-        vel[1] = kalman["vel_y"].update(new_vel[1])
-        vel[2] = kalman["vel_z"].update(new_vel[2])
-
-        # Apply Kalman filter to velocity
-        vel[0:3] = [float(match.group(i)) for i in range(14, 17)]
-
+        print(f"📥 Parsed | dt: {dt_ms}ms | vel: {velocity:.3f} | acc: {accel:.2f} | pitch: {pitch:.2f} | yaw: {yaw:.2f}")
 
         with lock:
-            for axis, a in zip("xyz", acc):
-                shared_data[f"acc_{axis}"].append(a)
-            for axis, g in zip("xyz", gyro):
-                shared_data[f"gyro_{axis}"].append(g)
-            for axis, v_ in zip("xyz", vel):
-                shared_data[f"vel_{axis}"].append(v_)
+            shared_data["vel_y"].append(velocity)
+            shared_data["acc_y"].append(accel)
+            shared_data["gyro_x"].append(pitch)
+            shared_data["gyro_y"].append(yaw)
 
         if recording:
-            timestamp = now.isoformat()
-            writer.writerow([timestamp] + vals + calib)
-            print("✅ Logged and appended")
-    else:
-        print("❌ No match")
+            log_entry = {
+                "time": datetime.now().isoformat(),
+                "dt": dt_ms,
+                "velocity": velocity,
+                "accel": accel,
+                "pitch": pitch,
+                "yaw": yaw
+            }
+            json.dump(log_entry, logfile)
+            logfile.write("\n")
 
+    except Exception as e:
+        print(f"❌ Error in notification handler: {e}")
 
 
 # === BLE Thread ===
 async def ble_loop():
     print("🔍 Scanning for device...")
     devices = await BleakScanner.discover()
+    for d in devices:
+        print(f"Discovered device: {d.name}")
     target = next((d for d in devices if d.name and DEVICE_NAME in d.name), None)
 
     if not target:
@@ -159,9 +145,22 @@ async def ble_loop():
 
     async with BleakClient(target.address) as client:
         print(f"✅ Connected to {DEVICE_NAME}")
+        await client.write_gatt_char(COMMAND_CHARACTERISTIC_UUID, b"start", response=True)
+        print("📡 Sent start command to device")
+
         await client.start_notify(CHARACTERISTIC_UUID, notification_handler)
-        while True:
-            await asyncio.sleep(1)
+
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            print("🛑 Sending stop command to device...")
+            await client.write_gatt_char(COMMAND_CHARACTERISTIC_UUID, b"stop", response=True)
+            await client.stop_notify(CHARACTERISTIC_UUID)
+
+
 
 def start_ble_thread():
     loop = asyncio.new_event_loop()
@@ -177,10 +176,25 @@ plots = {
 }
 
 lines = {}
+unit_labels = {
+    "acc": "Acceleration (m/s²)",
+    "gyro": "Angular Velocity (°/s)",
+    "vel": "Velocity (m/s)"
+}
 for key, ax in plots.items():
     ax.set_xlim(0, buffer_size)
-    ax.set_ylim(-10, 10) if key != "acc" else ax.set_ylim(-2, 2)
-    ax.set_title(key.upper())
+    if key == "acc":
+        ax.set_ylim(-1, 1)
+    elif key == "gyro":
+        ax.set_ylim(-50, 50)
+    elif key == "vel":
+        ax.set_ylim(-1, 1)
+
+    ax.set_title(f"{key.upper()} - {unit_labels[key]}")
+    ax.set_ylabel(unit_labels[key])
+
+
+    # ax.set_title(key.upper())
     ax.grid(True)
 
 lines["acc"] = [plots["acc"].plot([], [], label=axis)[0] for axis in "XYZ"]
