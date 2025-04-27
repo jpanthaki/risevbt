@@ -11,23 +11,26 @@ import SwiftUI
     @Published var processedVideoURL: URL?
     @Published var errorText: String? = nil
     
-    func getVideo(videoURL: URL?, onFinish: @escaping (URL) -> Void) {
+    func getVideo(videoURL: URL?, onFinish: @escaping (URL) -> Void, onError: @escaping (String) -> Void) {
         Task {
-            print(videoURL ?? "no url")
             guard let inputURL = videoURL else {
-                errorText = "No video provided"
+//                errorText = "No video provided"
+                onError("No video provided")
                 return
             }
             do {
                 let outputURL = try makeNewVideoURL()
                 
                 if let resultURL = await processVideo(inputURL: inputURL, outputURL: outputURL) {
-                    processedVideoURL = resultURL
+//                    processedVideoURL = resultURL
+                    onFinish(resultURL)
                 } else {
-                    errorText = "Tracking Failed"
+//                    errorText = "Tracking Failed"
+                    onError("Tracking Failed")
                 }
             } catch {
-                errorText = "Failed to create output URL: \(error.localizedDescription)"
+//                errorText = "Failed to create output URL: \(error.localizedDescription)"
+                onError("Failed to create output URL: \(error.localizedDescription)")
             }
         }
     }
@@ -42,7 +45,6 @@ struct FormView: View {
     let packets: [Packet]?
     let mcvValues: [Double]?
     let videoURL: URL?
-    @State var processedVideoURL: URL?
     @ObservedObject private var viewModel = FormViewModel()
     
     @State private var selectedLift: LiftType = .Bench
@@ -50,10 +52,11 @@ struct FormView: View {
     @State private var selectedStandard: WeightStandard = .lb
     @State private var reps: Int = 1
     @State private var rpe: Double = 6.0
+    @State private var processedVideoURL: URL?
+    @State private var errorText = ""
     
     var onSave: (DataModel) -> Void
     var onCancel: () -> Void
-    
     
     var body: some View {
         NavigationStack {
@@ -108,7 +111,7 @@ struct FormView: View {
                                 Spacer()
                                 Text(processedVideoURL?.lastPathComponent ?? "Processing...")
                                     .foregroundColor(.secondary)
-                                Text(viewModel.errorText ?? "no error")
+                                Text(errorText)
                             }
                         }
                         
@@ -125,7 +128,8 @@ struct FormView: View {
                                 standard: selectedStandard,
                                 reps: reps,
                                 rpe: rpe,
-                                videoURL: videoURL
+                                videoURL: videoURL,
+                                processedVideoURL: processedVideoURL 
                             )
                             onSave(model)
                         }
@@ -154,7 +158,8 @@ struct FormView: View {
                                 standard: selectedStandard,
                                 reps: reps,
                                 rpe: rpe,
-                                videoURL: videoURL
+                                videoURL: videoURL,
+                                processedVideoURL: processedVideoURL
                             )
                             onSave(model)
                         }
@@ -165,21 +170,16 @@ struct FormView: View {
             }
         }
         .onAppear {
-            print(videoURL)
             viewModel.getVideo(
                 videoURL: self.videoURL,
                 onFinish: { resultURL in
                     processedVideoURL = resultURL
-                    print(processedVideoURL ?? "got nothing from the viewmodel")
+                },
+                onError: { error in
+                    errorText = error
                 }
             )
         }
         .preferredColorScheme(preferDarkMode ? .dark : .light)
     }
 }
-
-//#Preview {
-//    
-//    
-//    FormView(accentColor: .orange, navbarBackground: .blue.opacity(0.5), backgroundColor: Color(UIColor.systemGroupedBackground), preferDarkMode: false, onSave: {model in print(model)}, onCancel: {})
-//}

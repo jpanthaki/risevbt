@@ -120,7 +120,7 @@ struct AnalysisView: View {
         0.55, 0.53, 0.57, 0.60, 0.58
     ]
     
-    let dummyModel = DataModel(packets: dummyPackets, mcvValues: dummyMCVValues, lift: .Bench, weight: 100, standard: .lb, reps: 10, rpe: 7, videoURL: nil)
+    let dummyModel = DataModel(packets: dummyPackets, mcvValues: dummyMCVValues, lift: .Bench, weight: 100, standard: .lb, reps: 10, rpe: 7, videoURL: nil, processedVideoURL: nil)
     
     AnalysisView(accentColor: .orange, navbarBackground: .blue.opacity(0.5), backgroundColor: Color(UIColor.systemGroupedBackground), preferDarkMode: false, model: dummyModel, onClose: {})
 }

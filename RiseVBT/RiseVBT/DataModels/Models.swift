@@ -44,7 +44,7 @@ final class DataModel {
     var rpe: Double
     
     
-    init(packets: [Packet]?, mcvValues: [Double]?, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL?) {
+    init(packets: [Packet]?, mcvValues: [Double]?, lift: LiftType, weight: Double, standard: WeightStandard, reps: Int, rpe: Double, videoURL: URL?, processedVideoURL: URL?) {
         
         if let pkts = packets {
             self.packets = pkts
@@ -59,6 +59,10 @@ final class DataModel {
         
         if let url = videoURL {
             self.videoURL = url
+        }
+        
+        if let url = processedVideoURL {
+            self.processedVideoURL = url
         }
     }
 }
