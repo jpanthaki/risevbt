@@ -228,11 +228,13 @@ void samplingTask(void* parameter) {
       float dt = (millis() - millisOld) / 1000.0;
       millisOld = millis();
       float rawAccY = acc.y();
+
       float filteredAccY = kalmanAccY.update(rawAccY);
 
       // Then integrate
-      float Vy = kalmanAccY.update(acc.y() * dt);
-      if (abs(Vy) < 0.08) Vy = 0.0;
+      // float Vy = kalmanAccY.update(acc.y() * dt);
+      float Vy = acc.y() * dt;
+      if (abs(Vy) < 0.05) Vy = 0.0;
 
 
       // // Clamp near-zero velocities
@@ -241,12 +243,13 @@ void samplingTask(void* parameter) {
 
       pkt.dt_ms = millis() - startTime;
       pkt.velocity = Vy * 1000;
+      // pkt.accel = rawAccY * 100;
       pkt.accel = filteredAccY * 100;
       pkt.pitch = euler.y() * 100;
       pkt.yaw = euler.z() * 100;
 
       // Detect concentric phase
-      if (acc.y() >= 0.05) {
+      if (acc.y() >= 0.08) {
         if (!inConcentric) {
           concentricIndex = 0;
           inConcentric = true;
@@ -257,7 +260,7 @@ void samplingTask(void* parameter) {
           concentricTimestamps[concentricIndex] = millis();
           concentricIndex++;
         }
-      } else if (acc.y() < -0.05 && inConcentric) {
+      } else if (acc.y() < -0.08 && inConcentric) {
         inConcentric = false;
         Serial.println("⏹️ Switched to Eccentric Phase");
         sendMCV(calculateMCV());
@@ -277,10 +280,10 @@ void bleTask(void* parameter) {
       dataChar->notify();
       uint8_t sys, gyro, accel, mag;
       bno.getCalibration(&sys, &gyro, &accel, &mag);
-      Serial.printf("📤 Sent IMU | dt: %d ms | vel: %.3f | acc: %.2f | pitch: %.2f | yaw: %.2f\n",
+      Serial.printf("Sent IMU | dt: %d ms | vel: %.3f | acc: %.2f | pitch: %.2f | yaw: %.2f\n",
         pkt.dt_ms, pkt.velocity / 1000.0, pkt.accel / 100.0,
         pkt.pitch / 100.0, pkt.yaw / 100.0);
-      Serial.printf("📊 Calibration -> Sys: %d | Gyro: %d | Accel: %d | Mag: %d\n", sys, gyro, accel, mag);
+      Serial.printf("Calibration -> Sys: %d | Gyro: %d | Accel: %d | Mag: %d\n", sys, gyro, accel, mag);
 
     }
     vTaskDelay(pdMS_TO_TICKS(5));
@@ -296,14 +299,15 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   EEPROM.begin(EEPROM_SIZE);
-  Serial.println("🌀 Booting...");
+  Serial.println("Booting...");
 
   if (!bno.begin()) {
-    Serial.println("❌ BNO055 not detected!");
+    Serial.println("BNO055 not detected!");
     while (1);
   }
   delay(1000);
 
+  bool is_calibrated = false;
   long magic = 0;
   EEPROM.get(0, magic);
 
@@ -311,7 +315,7 @@ void setup() {
     EEPROM.get(sizeof(long), bnoID);
     bno.getSensor(&sensor);
 
-    Serial.printf("🔍 EEPROM bnoID: %ld | Sensor ID: %ld\n", bnoID, sensor.sensor_id);
+    Serial.printf("EEPROM bnoID: %ld | Sensor ID: %ld\n", bnoID, sensor.sensor_id);
 
     if (bnoID == sensor.sensor_id) {
       Serial.println("🔁 Restoring calibration from EEPROM...");
@@ -324,15 +328,25 @@ void setup() {
       bno.setMode(OPERATION_MODE_NDOF);
       delay(25);
       displaySensorOffsets(calib);
-      Serial.println("✅ Calibration restored successfully!");
+
+      delay(500);
+      if (bno.isFullyCalibrated()) {
+        Serial.println("Calibration successfully restored!");
+        is_calibrated = true;
+      } else {
+        Serial.println("Calibration restore failed. Need fresh calibration.");
+      }
     } else {
-      Serial.println("⚠️ Sensor ID mismatch. Skipping calibration restore.");
+      Serial.println("Sensor ID mismatch. Skipping calibration restore.");
     }
-  } else {
-    Serial.println("🧭 Calibrating...");
+  }
+
+  if (!is_calibrated) {
+    Serial.println("Starting live calibration...");
+
     while (!bno.isFullyCalibrated()) {
       printCalibrationStatus();
-      delay(100);
+      delay(250);
     }
 
     adafruit_bno055_offsets_t calib;
@@ -349,13 +363,15 @@ void setup() {
 
     bno.setMode(OPERATION_MODE_NDOF);
     delay(25);
-    Serial.println("✅ Calibration saved to EEPROM!");
+    Serial.println("New calibration saved!");
     displaySensorOffsets(calib);
   }
 
   bno.setExtCrystalUse(true);
 
-  // === BLE Setup (unchanged)
+  Serial.println("Calibration complete! Initializing BLE...");
+
+  // === BLE Setup
   BLEDevice::init("sheeeeeed");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
@@ -376,7 +392,7 @@ void setup() {
   pAdvertising->addServiceUUID(SERVICE_UUID);
   BLEDevice::startAdvertising();
 
-  Serial.println("📡 BLE Advertising...");
+  Serial.println("📡 BLE Advertising Started ✅");
 
   dataQueue = xQueueCreate(PACKET_QUEUE_LENGTH, sizeof(SensorPacket));
   if (!dataQueue) {
