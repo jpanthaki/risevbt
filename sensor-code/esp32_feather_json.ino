@@ -216,6 +216,9 @@ void sendMCV(float mcv) {
 }
 
 // === Tasks ===
+bool readyForNextConcentric = true;
+float lastSentMCV = 0.0;    // NEW: store last MCV to print later
+
 void samplingTask(void* parameter) {
   SensorPacket pkt;
   uint32_t millisOld = millis();
@@ -248,22 +251,27 @@ void samplingTask(void* parameter) {
       pkt.pitch = euler.y() * 100;
       pkt.yaw = euler.z() * 100;
 
-      // Detect concentric phase
-      if (acc.y() >= 0.08) {
-        if (!inConcentric) {
-          concentricIndex = 0;
+      if (filteredAccY >= 0.08) {
+        if (!inConcentric && readyForNextConcentric) {
           inConcentric = true;
+          readyForNextConcentric = false;
+          concentricIndex = 0;
           Serial.println("🔄 Entered Concentric Phase");
         }
-        if (concentricIndex < MCV_BUFFER_SIZE) {
+        if (inConcentric && concentricIndex < MCV_BUFFER_SIZE) {
           concentricVelocities[concentricIndex] = Vy;
           concentricTimestamps[concentricIndex] = millis();
           concentricIndex++;
         }
-      } else if (acc.y() < -0.08 && inConcentric) {
+      } 
+      else if (filteredAccY < -0.08 && inConcentric) {
         inConcentric = false;
+        readyForNextConcentric = true;
         Serial.println("⏹️ Switched to Eccentric Phase");
-        sendMCV(calculateMCV());
+
+        float mcv = calculateMCV();
+        sendMCV(mcv);               // Still send normally
+        lastSentMCV = mcv;           // ⬅️ Store it for later printing!
       }
 
       xQueueSend(dataQueue, &pkt, portMAX_DELAY);
@@ -272,24 +280,32 @@ void samplingTask(void* parameter) {
   }
 }
 
+
 void bleTask(void* parameter) {
   SensorPacket pkt;
+  static float lastPrintedMCV = -9999.0; // Track if MCV changed
+
   while (true) {
     if (sendData && deviceConnected && xQueueReceive(dataQueue, &pkt, portMAX_DELAY)) {
       dataChar->setValue((uint8_t*)&pkt, sizeof(pkt));
       dataChar->notify();
       uint8_t sys, gyro, accel, mag;
       bno.getCalibration(&sys, &gyro, &accel, &mag);
-      Serial.printf("Sent IMU | dt: %d ms | vel: %.3f | acc: %.2f | pitch: %.2f | yaw: %.2f\n",
+
+      Serial.printf("📤 Sent IMU | dt: %d ms | vel: %.3f | acc: %.2f | pitch: %.2f | yaw: %.2f\n",
         pkt.dt_ms, pkt.velocity / 1000.0, pkt.accel / 100.0,
         pkt.pitch / 100.0, pkt.yaw / 100.0);
-      Serial.printf("Calibration -> Sys: %d | Gyro: %d | Accel: %d | Mag: %d\n", sys, gyro, accel, mag);
+      Serial.printf("📊 Calibration -> Sys: %d | Gyro: %d | Accel: %d | Mag: %d\n", sys, gyro, accel, mag);
 
+      // 🆕 Print MCV once after it's sent
+      if (lastSentMCV != lastPrintedMCV) {
+        Serial.printf("💥 Mean Concentric Velocity (MCV): %.3f m/s\n", lastSentMCV);
+        lastPrintedMCV = lastSentMCV;
+      }
     }
     vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
-
 
 #define EEPROM_SIZE 512
 #define MAGIC_KEY 0xA55A1234  // Used to verify EEPROM content is valid
