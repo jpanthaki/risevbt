@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+@MainActor class RecordViewModel: ObservableObject {
+    
+}
+
 struct RecordView: View {
     
     var accentColor: Color
@@ -15,8 +19,9 @@ struct RecordView: View {
     var preferDarkMode: Bool
     
     var videoOn: Bool = false
+    var sensorOn: Bool = true
     
-    var onStop: ([Packet], [Double], URL?) -> Void
+    var onStop: ([Packet]?, [Double]?, URL?) -> Void
     
     var onCancel: () -> Void
     
@@ -88,6 +93,7 @@ struct RecordView: View {
                                 recorder.onFinishedRecording = { url in
                                     let packets = service.packets
                                     let mcvValues = service.mcvValues
+                                    print("in recordview url is", url)
                                     onStop(packets, mcvValues, url)
                                 }
                                 recorder.stopRecording()

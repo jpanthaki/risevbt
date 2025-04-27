@@ -11,8 +11,9 @@ import SwiftUI
     @Published var processedVideoURL: URL?
     @Published var errorText: String? = nil
     
-    func getVideo(videoURL: URL?, onFinish: () -> Void) {
+    func getVideo(videoURL: URL?, onFinish: @escaping (URL) -> Void) {
         Task {
+            print(videoURL ?? "no url")
             guard let inputURL = videoURL else {
                 errorText = "No video provided"
                 return
@@ -38,10 +39,11 @@ struct FormView: View {
     var backgroundColor: Color
     var preferDarkMode: Bool
     
-    @State var packets: [Packet]?
-    @State var mcvValues: [Double]?
-    @State var videoURL: URL?
+    let packets: [Packet]?
+    let mcvValues: [Double]?
+    let videoURL: URL?
     @State var processedVideoURL: URL?
+    @ObservedObject private var viewModel = FormViewModel()
     
     @State private var selectedLift: LiftType = .Bench
     @State private var weight: Double = 0.0
@@ -52,7 +54,6 @@ struct FormView: View {
     var onSave: (DataModel) -> Void
     var onCancel: () -> Void
     
-    @ObservedObject var viewModel = FormViewModel()
     
     var body: some View {
         NavigationStack {
@@ -107,6 +108,7 @@ struct FormView: View {
                                 Spacer()
                                 Text(processedVideoURL?.lastPathComponent ?? "Processing...")
                                     .foregroundColor(.secondary)
+                                Text(viewModel.errorText ?? "no error")
                             }
                         }
                         
@@ -163,10 +165,12 @@ struct FormView: View {
             }
         }
         .onAppear {
+            print(videoURL)
             viewModel.getVideo(
-                videoURL: videoURL,
-                onFinish: {
-                    processedVideoURL = viewModel.processedVideoURL
+                videoURL: self.videoURL,
+                onFinish: { resultURL in
+                    processedVideoURL = resultURL
+                    print(processedVideoURL ?? "got nothing from the viewmodel")
                 }
             )
         }
@@ -174,8 +178,8 @@ struct FormView: View {
     }
 }
 
-#Preview {
-    
-    
-    FormView(accentColor: .orange, navbarBackground: .blue.opacity(0.5), backgroundColor: Color(UIColor.systemGroupedBackground), preferDarkMode: false, onSave: {model in print(model)}, onCancel: {})
-}
+//#Preview {
+//    
+//    
+//    FormView(accentColor: .orange, navbarBackground: .blue.opacity(0.5), backgroundColor: Color(UIColor.systemGroupedBackground), preferDarkMode: false, onSave: {model in print(model)}, onCancel: {})
+//}

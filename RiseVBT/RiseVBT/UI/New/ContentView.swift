@@ -15,6 +15,22 @@ struct Theme {
     var isDarkMode: Bool = false
 }
 
+enum ActiveSheet: Identifiable {
+    case basic
+    case video
+    case form(packets: [Packet]?, mcvValues: [Double]?, url: URL?)
+    case analysis(DataModel)
+    
+    var id: String {
+        switch self {
+        case .basic : return "basic"
+        case .video : return "video"
+        case .form: return "form"
+        case .analysis: return "analysis"
+        }
+    }
+}
+
 struct ContentView: View {
     let theme = Theme()
     
@@ -23,10 +39,12 @@ struct ContentView: View {
     
     @StateObject private var btService = BluetoothService()
     
-    @State private var showBasicRecord = false
-    @State private var showVideoRecord = false
-    @State private var showForm = false
-    @State private var showAnalysis = false
+//    @State private var showBasicRecord = false
+//    @State private var showVideoRecord = false
+//    @State private var showForm = false
+//    @State private var showAnalysis = false
+    
+    @State private var activeSheet: ActiveSheet?
     
     @State private var packetArray: [Packet]?
     @State private var mcvArray: [Double]?
@@ -43,15 +61,15 @@ struct ContentView: View {
                 preferDarkMode: theme.isDarkMode,
                 entries: entries,
                 onBasicRecord: {
-                    showBasicRecord = true
+                    activeSheet = .basic
                 },
                 onVideoRecord: {
-                    showVideoRecord = true
+                    activeSheet = .video
                 },
                 onSelect: { model in
                     selectedModel = model
                     print(selectedModel?.lift.rawValue ?? "NONE")
-                    showAnalysis = true
+                    activeSheet = .analysis(model)
                 },
                 onDelete: { model in
                     modelContext.delete(model)
@@ -59,79 +77,75 @@ struct ContentView: View {
                 service: btService
             )
         }
-        .fullScreenCover(isPresented: $showBasicRecord) {
-            RecordView(
-                accentColor: theme.accentColor,
-                navbarBackground: theme.navbarBackground,
-                backgroundColor: theme.backgroundColor,
-                preferDarkMode: theme.isDarkMode,
-                videoOn: false,
-                onStop: { packets, mcvValues, _ in
-                    packetArray = packets
-                    mcvArray = mcvValues
-                    videoURL = nil
-                    showBasicRecord = false
-                    showForm = true
-                },
-                onCancel: {
-                    showBasicRecord = false
-                },
-                service: btService
-            )
-            .interactiveDismissDisabled(true)
-        }
-        .fullScreenCover(isPresented: $showVideoRecord) {
-            RecordView(
-                accentColor: theme.accentColor,
-                navbarBackground: theme.navbarBackground,
-                backgroundColor: theme.backgroundColor,
-                preferDarkMode: theme.isDarkMode,
-                videoOn: true,
-                onStop: { packets, mcvValues, url in
-                    packetArray = packets
-                    mcvArray = mcvValues
-                    videoURL = url
-                    showVideoRecord = false
-                    showForm = true
-                },
-                onCancel: {
-                    showVideoRecord = false
-                },
-                service: btService
-            )
-            .interactiveDismissDisabled(true)
-        }
-        .fullScreenCover(isPresented: $showForm) {
-            FormView(
-                accentColor: theme.accentColor,
-                navbarBackground: theme.navbarBackground,
-                backgroundColor: theme.backgroundColor,
-                preferDarkMode: theme.isDarkMode,
-                packets: packetArray,
-                mcvValues: mcvArray,
-                videoURL: videoURL,
-                onSave: { model in
-                    modelContext.insert(model)
-                    showForm = false
-                },
-                onCancel: {
-                    showForm = false
-                }
-            )
-            .interactiveDismissDisabled(true)
-        }
-        .fullScreenCover(item: $selectedModel) { model in
-            AnalysisView(
-                accentColor: theme.accentColor,
-                navbarBackground: theme.navbarBackground,
-                backgroundColor: theme.backgroundColor,
-                preferDarkMode: theme.isDarkMode,
-                model: model,
-                onClose: {
-                    showAnalysis = false
-                    selectedModel = nil
-                }
-            )
+        .fullScreenCover(item: $activeSheet) { sheet in
+            switch sheet {
+            case .basic:
+                RecordView(
+                    accentColor: theme.accentColor,
+                    navbarBackground: theme.navbarBackground,
+                    backgroundColor: theme.backgroundColor,
+                    preferDarkMode: theme.isDarkMode,
+                    videoOn: false,
+                    onStop: { packets, mcvValues, _ in
+                        activeSheet = .form(
+                            packets: packets,
+                            mcvValues: mcvValues,
+                            url: nil
+                        )
+                    },
+                    onCancel: {
+                        activeSheet = nil
+                    },
+                    service: btService
+                )
+            case .video:
+                RecordView(
+                    accentColor: theme.accentColor,
+                    navbarBackground: theme.navbarBackground,
+                    backgroundColor: theme.backgroundColor,
+                    preferDarkMode: theme.isDarkMode,
+                    videoOn: true,
+                    onStop: { packets, mcvValues, url in
+                        activeSheet = .form(
+                            packets: packets,
+                            mcvValues: mcvValues,
+                            url: url
+                        )
+                    },
+                    onCancel: {
+                        activeSheet = nil
+                    },
+                    service: btService
+                )
+            case .form(let packets, let mcvValues, let url):
+                FormView(
+                    accentColor: theme.accentColor,
+                    navbarBackground: theme.navbarBackground,
+                    backgroundColor: theme.backgroundColor,
+                    preferDarkMode: theme.isDarkMode,
+                    packets: packets,
+                    mcvValues: mcvValues,
+                    videoURL: url,
+                    onSave: { model in
+                        modelContext.insert(model)
+                        activeSheet = nil
+                    },
+                    onCancel: {
+                        activeSheet = nil
+                    }
+                )
+            case .analysis(let model):
+                AnalysisView(
+                    accentColor: theme.accentColor,
+                    navbarBackground: theme.navbarBackground,
+                    backgroundColor: theme.backgroundColor,
+                    preferDarkMode: theme.isDarkMode,
+                    model: model,
+                    onClose: {
+                        activeSheet = nil
+                    }
+                )
+            }
         }
     }
 }

@@ -119,6 +119,7 @@ class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate, ObservableObject
         }
         
         DispatchQueue.main.async {
+            print("sending url to view", outputFileURL)
             self.onFinishedRecording?(outputFileURL)
         }
         
@@ -127,6 +128,7 @@ class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate, ObservableObject
             PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: outputFileURL)
         }) { saved, error in
             if saved {
+                print(outputFileURL)
                 print("Successfully saved video to Photos.")
             } else if let error = error {
                 print("Error saving video to Photos: \(error.localizedDescription)")
