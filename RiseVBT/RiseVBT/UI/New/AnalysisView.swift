@@ -37,11 +37,37 @@ struct AnalysisView: View {
             ZStack {
                 backgroundColor.ignoresSafeArea()
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack {
                         //video goes here if it's there
                         if let url = model.processedVideoURL {
-                            VideoPlayer(player: AVPlayer(url: url))
-                                .frame(height: 300)
+                            ZStack {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, minHeight: 450)
+                                    .cornerRadius(12)
+                                    .shadow(radius: 4)
+                                VideoPlayer(player: AVPlayer(url: url))
+                                    .frame(minHeight: 450)
+                                    .padding()
+                            }
+                        } else if let url = model.videoURL {
+                            ZStack {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, minHeight: 450)
+                                    .cornerRadius(12)
+                                    .shadow(radius: 4)
+                                VideoPlayer(player: AVPlayer(url: url))
+                                    .frame(minHeight: 450)
+                                    .padding()
+                            }
+                        }
+                        ZStack {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(maxWidth: .infinity, minHeight: 450)
+                                .cornerRadius(12)
+                                .shadow(radius: 4)
                         }
                         
                         //chart here
@@ -51,26 +77,18 @@ struct AnalysisView: View {
                                 y: .value("Velocity", p.velocity)
                             )
                         }
-                        .frame(height: 200)
+                        .frame(height: 150)
                         .chartXAxisLabel("Time (s)")
                         .chartYAxisLabel("m/s")
                         
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Lift: \(model.lift.rawValue)")
-                            Text("Weight: \(model.weight, format: .number.precision(.fractionLength(1))) \(model.standard.rawValue)")
-                            Text("Reps: \(model.reps)")
-                            Text("RPE: \(model.rpe, format: .number.precision(.fractionLength(1)))")
-                        }
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 12).fill(.white).shadow(radius: 4))
-                        
-                        Button ("View Bar Path Analysis") {
-                            //play footage here
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(accentColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
+//                        VStack(alignment: .leading, spacing: 8) {
+//                            Text("Lift: \(model.lift.rawValue)")
+//                            Text("Weight: \(model.weight, format: .number.precision(.fractionLength(1))) \(model.standard.rawValue)")
+//                            Text("Reps: \(model.reps)")
+//                            Text("RPE: \(model.rpe, format: .number.precision(.fractionLength(1)))")
+//                        }
+//                        .padding()
+//                        .background(RoundedRectangle(cornerRadius: 12).fill(.white).shadow(radius: 4))
                     }
                     .padding()
                 }
@@ -95,7 +113,7 @@ struct AnalysisView: View {
 #Preview {
     let dummyPackets: [Packet] = (0..<1000).compactMap { i in
         // 1) Create some sample values
-        let timeMs: UInt32 = UInt32(i * 10)             // every 10 ms
+        let timeMs: UInt16 = UInt16(i * 10)             // every 10 ms
         let velocity: Int16  = Int16.random(in: -2000...2000)   // ±2 m/s
         let accel:    Int16  = Int16.random(in: -1000...1000)   // ±10 m/s²
         let pitch:    Int16  = Int16.random(in: -18000...18000) // ±180°

@@ -50,7 +50,10 @@ final class DataModel {
             self.packets = pkts
         }
         
-        self.mcvValues = mcvValues
+        if let mcvs = mcvValues {
+            self.mcvValues = mcvs
+        }
+        
         self.lift = lift
         self.weight = weight
         self.standard = standard

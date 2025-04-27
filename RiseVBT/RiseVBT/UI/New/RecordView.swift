@@ -7,10 +7,6 @@
 
 import SwiftUI
 
-@MainActor class RecordViewModel: ObservableObject {
-    
-}
-
 struct RecordView: View {
     
     var accentColor: Color

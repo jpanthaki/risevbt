@@ -198,17 +198,28 @@ extension BluetoothService: CBPeripheralDelegate {
             
             print(data.count)
             
-            let rawMean: Float = data.withUnsafeBytes {
-                $0.load(as: Float.self)
+            let floatSize = MemoryLayout<Float>.size
+            guard data.count >= floatSize else {
+                print("Expected \(floatSize) bytes for Float, got \(data.count)")
+                return
             }
             
-            guard rawMean.isFinite else {
+            let rawMean: Float = data.withUnsafeBytes { rawBuffer in
+                guard let floatPtr = rawBuffer.bindMemory(to: Float.self).baseAddress else {
+                    print("Failed to bind memory to Float")
+                    return 0.0
+                }
+                return floatPtr.pointee
+            }
+            
+            let meanValue = Float(bitPattern: rawMean.bitPattern.littleEndian)
+            
+            guard meanValue.isFinite else {
                 print("received non-finite mean")
                 return
             }
             
-            let mean = Double(rawMean)
-            
+            let mean = Double(meanValue)
             DispatchQueue.main.async {
                 self.computedMCV = mean
                 self.mcvValues.append(mean)

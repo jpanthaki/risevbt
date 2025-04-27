@@ -15,7 +15,7 @@ struct Packet: Codable {
     let pitch: Int16
     let yaw: Int16
     
-    static let byteSize = MemoryLayout<UInt16>.size + 4 * MemoryLayout<Int16>.size
+    static let byteSize = 5 * MemoryLayout<Int16>.size
     
     init?(data: Data) {
         guard data.count == Packet.byteSize else {
@@ -25,16 +25,12 @@ struct Packet: Codable {
     }
     
     private init(from data: Data, offset: Int) {
-        timeMs = data.withUnsafeBytes{ ptr in
-            let base = ptr.baseAddress!.advanced(by: offset)
-            return UInt16(littleEndian: base.assumingMemoryBound(to: UInt16.self).pointee)
-        }
-        
-        let base = data.withUnsafeBytes { ptr in ptr.baseAddress!.advanced(by: offset + 4) }
-        velocity = Int16(littleEndian: base.assumingMemoryBound(to: Int16.self).pointee)
-        accel    = Int16(littleEndian: base.advanced(by: 2).assumingMemoryBound(to: Int16.self).pointee)
-        pitch    = Int16(littleEndian: base.advanced(by: 4).assumingMemoryBound(to: Int16.self).pointee)
-        yaw      = Int16(littleEndian: base.advanced(by: 6).assumingMemoryBound(to: Int16.self).pointee)
+        let base = data.withUnsafeBytes { ptr in ptr.baseAddress!.advanced(by: offset) }
+        timeMs = UInt16(littleEndian: base.load(as: UInt16.self))
+        velocity = Int16(littleEndian: base.advanced(by: 2).load(as: Int16.self))
+        accel = Int16(littleEndian: base.advanced(by: 4).load(as: Int16.self))
+        pitch = Int16(littleEndian: base.advanced(by: 6).load(as: Int16.self))
+        yaw = Int16(littleEndian: base.advanced(by: 8).load(as: Int16.self))
     }
     
     var timeS: Double { Double(timeMs) / 1000.0 }
