@@ -33,7 +33,7 @@ func processVideo(inputURL: URL, outputURL: URL) async -> URL? {
     
     let overlayProcessor = VideoOverlayProcessor()
     
-    let lineHandler = VideoOverlayProcessor.makePathHandler(boxes: boxes, color: CGColor(red: 0, green: 1, blue: 0, alpha: 1))
+    let lineHandler = VideoOverlayProcessor.makePathHandler(boxes: boxes, color: CGColor(red: 0, green: 1, blue: 0, alpha: 1), lineWidth: 4)
     
     do {
         let _ = try await overlayProcessor.process(
