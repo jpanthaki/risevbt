@@ -74,9 +74,10 @@ public:
     P[0][0] = 1.0; P[0][1] = 0.0;
     P[1][0] = 0.0; P[1][1] = 1.0;
 
-    Q[0][0] = 1e-4; Q[0][1] = 0.0;
-    Q[1][0] = 0.0;  Q[1][1] = 1e-4;
-    R = 0.01;
+    Q[0][0] = 1e-2; Q[0][1] = 0.0;
+    Q[1][0] = 0.0;  Q[1][1] = 5e-2;
+    R = 0.1;
+
   }
 
   void update(float measured_accel) {
@@ -128,7 +129,7 @@ public:
 private:
   float q, r, p, x;
 };
-KalmanFilter kalmanAccY;
+KalmanFilter kalmanAccz;
 
 
 
@@ -214,10 +215,33 @@ void sendMCV(float mcv) {
   mcvChar->notify();
   Serial.printf("📤 Sent MCV: %.3f\n", mcv);
 }
+float accBiasZ = 0.0;
+
+void calibrateAccBias() {
+  accBiasZ = 0.0;
+  const int biasSamples = 50;
+
+  Serial.println("📏 Calibrating acceleration bias...");
+  for (int i = 0; i < biasSamples; i++) {
+    imu::Vector<3> acc = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+    accBiasZ += acc.z();
+    delay(20); // 20ms * 50 = 1 second
+  }
+  accBiasZ /= biasSamples;
+  Serial.print("✅ Acceleration bias (Z): ");
+  Serial.println(accBiasZ, 6);
+}
+
 
 // === Tasks ===
 bool readyForNextConcentric = true;
 float lastSentMCV = 0.0;    // NEW: store last MCV to print later
+float prevAccz, prev_filteredAccz = 0.0;    // previous filtered acceleration
+float Vz = 0.0;                  // integrated velocity
+
+unsigned long stillStartTime = 0;
+bool isStill = false;
+
 
 void samplingTask(void* parameter) {
   SensorPacket pkt;
@@ -230,14 +254,51 @@ void samplingTask(void* parameter) {
 
       float dt = (millis() - millisOld) / 1000.0;
       millisOld = millis();
-      float rawAccY = acc.y();
+      float rawAccz = acc.z() - accBiasZ;
+      if (abs(rawAccz) < 0.6f) rawAccz = 0.0f;
 
-      float filteredAccY = kalmanAccY.update(rawAccY);
+      // Simple high-pass filter example
+      float alpha = 0.95;
+      float filteredAccz = alpha * (filteredAccz + rawAccz - prevAccz);
+      prevAccz = rawAccz;
+
+      // bool currentlyStill = abs(rawAccz) < 0.07;
+
+      // if (currentlyStill) {
+      //   if (!isStill) {
+      //     isStill = true;
+      //     stillStartTime = millis();
+      //   }
+      //   else if (abs(rawAccz) < 0.9) {  // 1 seconds still
+      //     Vz = 0.0;  // RESET velocity!
+      //   }
+      // } else {
+      //   isStill = false; // bar is moving again
+      // }
+
+      // float filteredAccz = kalmanAccz.update(rawAccz);
 
       // Then integrate
       // float Vy = kalmanAccY.update(acc.y() * dt);
-      float Vy = acc.y() * dt;
-      if (abs(Vy) < 0.05) Vy = 0.0;
+      // Normal trapezoidal integration
+      Vz += 0.5f * (prev_filteredAccz + filteredAccz) * dt;
+
+      // If both acceleration and velocity are very small => bar is resting
+      if (abs(filteredAccz) < 0.4f && abs(Vz) < 0.8f) {
+          Vz = 0.0;
+      }
+      // Gentle decay to zero if velocity is small but not quite zero
+      if (abs(Vz) < 2.0f && abs(filteredAccz) < 0.5f) {
+          Vz *= 0.95f;  // Slow decay toward zero
+      }
+      // Clamp extremely tiny velocities for clean plots
+      if (abs(Vz) < 0.02f) {
+          Vz = 0.0f;
+      }
+
+      // Save for next integration step
+      prev_filteredAccz = filteredAccz;
+
 
 
       // // Clamp near-zero velocities
@@ -245,13 +306,13 @@ void samplingTask(void* parameter) {
 
 
       pkt.dt_ms = millis() - startTime;
-      pkt.velocity = Vy * 1000;
+      pkt.velocity = Vz * 1000;
       // pkt.accel = rawAccY * 100;
-      pkt.accel = filteredAccY * 100;
+      pkt.accel = rawAccz * 100;
       pkt.pitch = euler.y() * 100;
       pkt.yaw = euler.z() * 100;
 
-      if (filteredAccY >= 0.08) {
+      if (rawAccz >= 0.03) {
         if (!inConcentric && readyForNextConcentric) {
           inConcentric = true;
           readyForNextConcentric = false;
@@ -259,12 +320,12 @@ void samplingTask(void* parameter) {
           Serial.println("🔄 Entered Concentric Phase");
         }
         if (inConcentric && concentricIndex < MCV_BUFFER_SIZE) {
-          concentricVelocities[concentricIndex] = Vy;
+          concentricVelocities[concentricIndex] = Vz;
           concentricTimestamps[concentricIndex] = millis();
           concentricIndex++;
         }
       } 
-      else if (filteredAccY < -0.08 && inConcentric) {
+      else if (rawAccz < -0.03 && inConcentric) {
         inConcentric = false;
         readyForNextConcentric = true;
         Serial.println("⏹️ Switched to Eccentric Phase");
@@ -386,7 +447,7 @@ void setup() {
   bno.setExtCrystalUse(true);
 
   Serial.println("Calibration complete! Initializing BLE...");
-
+  calibrateAccBias();
   // === BLE Setup
   BLEDevice::init("sheeeeeed");
   pServer = BLEDevice::createServer();
