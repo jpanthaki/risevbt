@@ -12,6 +12,7 @@ enum LiftType: String, Codable, CaseIterable, Identifiable {
     case Bench
     case Squat
     case Deadlift
+    case OverheadPress
     
     var id: String { self.rawValue }
 }
