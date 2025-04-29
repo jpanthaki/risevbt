@@ -35,14 +35,9 @@ struct ContentView: View {
     let theme = Theme()
     
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \DataModel.createdAt) private var entries: [DataModel]
+    @Query(sort: \DataModel.createdAt, order: .reverse) private var entries: [DataModel]
     
     @StateObject private var btService = BluetoothService()
-    
-//    @State private var showBasicRecord = false
-//    @State private var showVideoRecord = false
-//    @State private var showForm = false
-//    @State private var showAnalysis = false
     
     @State private var activeSheet: ActiveSheet?
     
@@ -68,7 +63,6 @@ struct ContentView: View {
                 },
                 onSelect: { model in
                     selectedModel = model
-                    print(selectedModel?.lift.rawValue ?? "NONE")
                     activeSheet = .analysis(model)
                 },
                 onDelete: { model in
