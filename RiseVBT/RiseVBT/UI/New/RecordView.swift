@@ -48,9 +48,9 @@ struct RecordView: View {
                         }
                     }
                     VStack {
-                        Text("\(service.computedMCV != nil ? String(format: "%.2f", service.computedMCV ?? 0.0) : "–")")
+                        Text("\(service.currentV != nil ? String(format: "%.2f", service.currentV ?? 0.0) : "–")")
                             .font(.system(size: 48, weight: .bold, design: .rounded))
-                            .foregroundColor(service.computedMCV != nil ? (service.computedMCV ?? 0.0 > 0.5 ? .green : .red) : .secondary)
+                            .foregroundColor(service.currentV != nil ? (service.currentV ?? 0.0 > 0.5 ? .green : .red) : .secondary)
                         Text("m/s")
                             .font(.headline)
                             .foregroundColor(.secondary)

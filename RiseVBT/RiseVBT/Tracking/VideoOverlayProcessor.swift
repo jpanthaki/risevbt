@@ -159,6 +159,7 @@ fileprivate func overlayVideo(
     
     // reader that uses the video composition
     let reader = try! AVAssetReader(asset: asset)
+    
     let readerOutput = AVAssetReaderVideoCompositionOutput(
         videoTracks: [track],
         videoSettings: [ kCVPixelBufferPixelFormatTypeKey as String:

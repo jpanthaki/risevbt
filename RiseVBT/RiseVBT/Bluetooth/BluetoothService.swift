@@ -37,6 +37,7 @@ class BluetoothService: NSObject, ObservableObject {
     @Published var currPacket: String = ""
     @Published var currData: Data = Data()
     @Published var computedMCV: Double?
+    @Published var currentV: Double?
     @Published var mcvValues: [Double] = []
     
     override init() {
@@ -187,6 +188,7 @@ extension BluetoothService: CBPeripheralDelegate {
             }
             
             DispatchQueue.main.async {
+                self.currentV = packet.velocityMs
                 self.packets.append(packet)
             }
             
