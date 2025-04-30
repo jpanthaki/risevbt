@@ -10,6 +10,14 @@
 #include <EEPROM.h>
 #include <utility/imumaths.h>
 
+
+#include "Adafruit_MAX1704X.h"
+#include <Adafruit_NeoPixel.h>
+#include "Adafruit_TestBed.h"
+#include <Adafruit_BME280.h>
+#include <Adafruit_ST7789.h> 
+#include <Fonts/FreeSans12pt7b.h>
+
 // UUIDs
 #define SERVICE_UUID "7c961cfd-2527-4808-a9b0-9ce954427712"
 #define DATA_CHARACTERISTIC_UUID "207a2a33-ab38-4748-8702-5ff50b2d673f"
@@ -19,6 +27,21 @@
 #define SAMPLE_INTERVAL_MS 50
 #define PACKET_QUEUE_LENGTH 10
 #define MCV_BUFFER_SIZE 120
+
+
+#define BNO055_SAMPLERATE_DELAY_MS (100)
+
+
+// graphics
+Adafruit_BME280 bme; // I2C
+bool bmefound = false;
+extern Adafruit_TestBed TB;
+
+Adafruit_MAX17048 max_bat;
+Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+GFXcanvas16 canvas(240, 135);
+
+bool maxfound = false;
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
 
@@ -296,6 +319,10 @@ void samplingTask(void* parameter) {
           Vz = 0.0f;
       }
 
+      if (abs(Vz) > 5.0f) {
+          Vz = 0.0f;
+      }
+
       // Save for next integration step
       prev_filteredAccz = filteredAccz;
 
@@ -371,78 +398,210 @@ void bleTask(void* parameter) {
 #define EEPROM_SIZE 512
 #define MAGIC_KEY 0xA55A1234  // Used to verify EEPROM content is valid
 
+unsigned long lastDisplayUpdate = 0;
+const unsigned long displayInterval = 100;  // Update every 100 ms
+uint8_t j = 0;
+
+
 // === Setup ===
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  EEPROM.begin(EEPROM_SIZE);
-  Serial.println("Booting...");
 
+  // turn on the TFT / I2C power supply
+  pinMode(TFT_I2C_POWER, OUTPUT);
+  digitalWrite(TFT_I2C_POWER, HIGH);
+
+  pinMode(NEOPIXEL_POWER, OUTPUT);
+  digitalWrite(NEOPIXEL_POWER, HIGH);
+  delay(10);
+  
+  TB.neopixelPin = PIN_NEOPIXEL;
+  TB.neopixelNum = 1; 
+  TB.begin();
+  TB.setColor(WHITE);
+
+  display.init(135, 240); // Init ST7789 240x135
+  display.setRotation(3);
+  canvas.setFont(&FreeSans12pt7b);
+  canvas.setTextColor(ST77XX_WHITE); 
+  if (!max_bat.begin()) {
+    Serial.println(F("Couldnt find Adafruit MAX1704X?\nMake sure a battery is plugged in!"));
+    while (1) delay(10);
+  }
+  Serial.print(F("Found MAX17048"));
+  Serial.print(F(" with Chip ID: 0x")); 
+  Serial.println(max_bat.getChipID(), HEX);
+  maxfound = true;
+  
+  
   if (!bno.begin()) {
-    Serial.println("BNO055 not detected!");
+    Serial.println("BNO055 not detected. Check wiring.");
     while (1);
   }
+
   delay(1000);
 
-  bool is_calibrated = false;
-  long magic = 0;
-  EEPROM.get(0, magic);
-
-  if (magic == MAGIC_KEY) {
-    EEPROM.get(sizeof(long), bnoID);
+  if (alreadyCalibrated) {
+    // Load calibration from EEPROM
+    EEPROM.get(eeAddress, bnoID);
     bno.getSensor(&sensor);
 
-    Serial.printf("EEPROM bnoID: %ld | Sensor ID: %ld\n", bnoID, sensor.sensor_id);
+    if (bnoID != sensor.sensor_id) {
+      Serial.println("No matching calibration data found.");
+    } 
+    
+    // load old register values from EEPROM into BNO 
+    else {
+      Serial.println("Restoring calibration from EEPROM...");
+      delay(1000);
 
-    if (bnoID == sensor.sensor_id) {
-      Serial.println("🔁 Restoring calibration from EEPROM...");
-      adafruit_bno055_offsets_t calib;
-      EEPROM.get(sizeof(long) * 2, calib);
+      adafruit_bno055_offsets_t calibrationData;
 
+      EEPROM.get(eeAddress + sizeof(long), calibrationData);
+
+      // set to config mode (can only read offsets and radius in config mode)
+      // write sensor offsets and radius data
+      // change to fusion mode
+
+      // ******
       bno.setMode(OPERATION_MODE_CONFIG);
       delay(25);
-      bno.setSensorOffsets(calib);
+
+      Serial.println("calibration data loaded into registers");
+      bno.setSensorOffsets(calibrationData);
+
+      // *******
       bno.setMode(OPERATION_MODE_NDOF);
       delay(25);
-      displaySensorOffsets(calib);
 
-      delay(500);
-      if (bno.isFullyCalibrated()) {
-        Serial.println("Calibration successfully restored!");
-        is_calibrated = true;
-      } else {
-        Serial.println("Calibration restore failed. Need fresh calibration.");
-      }
-    } else {
-      Serial.println("Sensor ID mismatch. Skipping calibration restore.");
+      displaySensorOffsets(calibrationData);
+
+      printCalibrationStatus();
+
+      // set after configuring calibration data
+      // bno.setExtCrystalUse(true);
+
+      // if (zero) {
+      //   Serial.println("zeroing... please do not move the device");
+      //   delay(1000);
+      // }
     }
+
+    if (millis() - lastDisplayUpdate >= displayInterval) {
+    lastDisplayUpdate = millis();  // Reset timer
+
+    canvas.fillScreen(ST77XX_BLACK);
+    canvas.setCursor(0, 25);
+    canvas.setTextColor(ST77XX_NORON);
+    canvas.println("RiseVBT");
+
+    canvas.setTextColor(ST77XX_WHITE); 
+    canvas.print("Battery: ");
+    canvas.print(max_bat.cellVoltage(), 1);
+    canvas.print(" V  /  ");
+    canvas.print(max_bat.cellPercent(), 0);
+    canvas.println("%");
+
+    canvas.setTextColor(ST77XX_RED);
+    canvas.print("Fully calibrated!");
+
+    canvas.setTextColor(ST77XX_WHITE);
+    display.drawRGBBitmap(0, 0, canvas.getBuffer(), 240, 135);
+
+    // Light up backlight if off
+    pinMode(TFT_BACKLITE, OUTPUT);
+    digitalWrite(TFT_BACKLITE, HIGH);
+
+    // Cycle text bar color
+    TB.setColor(TB.Wheel(j++));
   }
+} 
+  
+  // calibrate sensor and store values into EEPROM
+  else {
+    Serial.println("Starting calibration process...");
+    delay(1000);
 
-  if (!is_calibrated) {
-    Serial.println("Starting live calibration...");
-
+    eeAddress = 0;
     while (!bno.isFullyCalibrated()) {
       printCalibrationStatus();
-      delay(250);
+
+
+      uint8_t system, gyros, accel, magnet;
+  bno.getCalibration(&sys, &gyros, &accel, &magnet);
+
+  if (millis() - lastDisplayUpdate >= displayInterval) {
+    lastDisplayUpdate = millis();  // Reset timer
+
+    canvas.fillScreen(ST77XX_BLACK);
+    canvas.setCursor(0, 25);
+    canvas.setTextColor(ST77XX_NORON);
+    canvas.println("RiseVBT");
+
+    canvas.setTextColor(ST77XX_WHITE); 
+    canvas.print("Battery: ");
+    canvas.print(max_bat.cellVoltage(), 1);
+    canvas.print(" V  /  ");
+    canvas.print(max_bat.cellPercent(), 0);
+    canvas.println("%");
+
+    canvas.setTextColor(ST77XX_RED);
+    canvas.print("A cal: ");
+    canvas.print(float(accel), 0);
+    canvas.println(",");
+    canvas.print("G cal: ");
+    canvas.print(float(gyros), 0);
+    canvas.println(",");
+    canvas.print("M cal: ");
+    canvas.print(float(magnet), 0);
+
+    canvas.setTextColor(ST77XX_WHITE);
+    display.drawRGBBitmap(0, 0, canvas.getBuffer(), 240, 135);
+
+    // Light up backlight if off
+    pinMode(TFT_BACKLITE, OUTPUT);
+    digitalWrite(TFT_BACKLITE, HIGH);
+
+    // Cycle text bar color
+    TB.setColor(TB.Wheel(j++));
+  }
+
+      delay(BNO055_SAMPLERATE_DELAY_MS);
     }
 
-    adafruit_bno055_offsets_t calib;
+    // *****
     bno.setMode(OPERATION_MODE_CONFIG);
-    delay(25);
-    bno.getSensorOffsets(calib);
+
+    Serial.println("Calibration complete!");
+    adafruit_bno055_offsets_t newCalib;
+    bno.getSensorOffsets(newCalib);
+    displaySensorOffsets(newCalib);
+
     bno.getSensor(&sensor);
     bnoID = sensor.sensor_id;
 
-    EEPROM.put(0, MAGIC_KEY);
-    EEPROM.put(sizeof(long), bnoID);
-    EEPROM.put(sizeof(long) * 2, calib);
+
+    EEPROM.put(eeAddress, bnoID);
+    EEPROM.put(eeAddress + sizeof(long), newCalib);
+
     EEPROM.commit();
 
+    delay(500);
+    Serial.println("Calibration data saved to EEPROM.");
+
+    // *****
     bno.setMode(OPERATION_MODE_NDOF);
-    delay(25);
-    Serial.println("New calibration saved!");
-    displaySensorOffsets(calib);
+
+    bno.setExtCrystalUse(true);
+
   }
+
+  printCalibrationStatus();
+  // figure out mag mode
+  // bno.setMode(OPERATION_MODE_NDOF);
+  delay(500);
+
 
   bno.setExtCrystalUse(true);
 
@@ -481,4 +640,43 @@ void setup() {
   xTaskCreatePinnedToCore(bleTask, "BLE Task", 4096, NULL, 1, NULL, 1);
 }
 
-void loop() {}
+void loop() {
+  // uint8_t system, gyros, accel, magnet;
+  // bno.getCalibration(&sys, &gyros, &accel, &magnet);
+
+  // if (millis() - lastDisplayUpdate >= displayInterval) {
+  //   lastDisplayUpdate = millis();  // Reset timer
+
+  //   canvas.fillScreen(ST77XX_BLACK);
+  //   canvas.setCursor(0, 25);
+  //   canvas.setTextColor(ST77XX_NORON);
+  //   canvas.println("RiseVBT");
+
+  //   canvas.setTextColor(ST77XX_WHITE); 
+  //   canvas.print("Battery: ");
+  //   canvas.print(max_bat.cellVoltage(), 1);
+  //   canvas.print(" V  /  ");
+  //   canvas.print(max_bat.cellPercent(), 0);
+  //   canvas.println("%");
+
+  //   canvas.setTextColor(ST77XX_RED);
+  //   canvas.print("A cal: ");
+  //   canvas.print(float(accel), 0);
+  //   canvas.println(",");
+  //   canvas.print("G cal: ");
+  //   canvas.print(float(gyros), 0);
+  //   canvas.println(",");
+  //   canvas.print("M cal: ");
+  //   canvas.print(float(magnet), 0);
+
+  //   canvas.setTextColor(ST77XX_WHITE);
+  //   display.drawRGBBitmap(0, 0, canvas.getBuffer(), 240, 135);
+
+  //   // Light up backlight if off
+  //   pinMode(TFT_BACKLITE, OUTPUT);
+  //   digitalWrite(TFT_BACKLITE, HIGH);
+
+  //   // Cycle text bar color
+  //   TB.setColor(TB.Wheel(j++));
+  // }
+}
