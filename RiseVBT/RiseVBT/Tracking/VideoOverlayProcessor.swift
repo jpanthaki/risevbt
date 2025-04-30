@@ -12,6 +12,7 @@ import CoreImage
 
 
 public struct VideoOverlayProcessor {
+    
     public init() {}
     
     public func process (
@@ -158,7 +159,15 @@ fileprivate func overlayVideo(
     videoComp.renderSize = size
     
     // reader that uses the video composition
-    let reader = try! AVAssetReader(asset: asset)
+//    let reader = try! AVAssetReader(asset: asset)
+    
+    let reader: AVAssetReader
+    do {
+        reader = try AVAssetReader(asset: asset)
+    } catch {
+        completion(.failure(error))
+        return
+    }
     
     let readerOutput = AVAssetReaderVideoCompositionOutput(
         videoTracks: [track],
@@ -166,13 +175,30 @@ fileprivate func overlayVideo(
                             kCVPixelFormatType_32BGRA ]
     )
     readerOutput.videoComposition = videoComp
+    
     reader.add(readerOutput)
+    
+    guard reader.startReading() else {
+        completion(.failure(reader.error!))
+        return
+    }
     
     // writer setup
     if FileManager.default.fileExists(atPath: outputURL.path) {
         try? FileManager.default.removeItem(at: outputURL)
     }
-    let writer = try! AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+    
+//    let writer = try! AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+    
+    let writer: AVAssetWriter
+    
+    do {
+        writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+    } catch {
+        completion(.failure(error))
+        return
+    }
+    
     let videoSettings: [String: Any] = [
         AVVideoCodecKey: AVVideoCodecType.h264,
         AVVideoWidthKey: Int(size.width),
@@ -193,12 +219,12 @@ fileprivate func overlayVideo(
     writer.add(writerInput)
     
     // start
-    reader.startReading()
     writer.startWriting()
     writer.startSession(atSourceTime: .zero)
     
     let queue = DispatchQueue(label: "video.overlay")
     writerInput.requestMediaDataWhenReady(on: queue) {
+        
         while writerInput.isReadyForMoreMediaData {
             guard
                 let sample = readerOutput.copyNextSampleBuffer(),
