@@ -126,6 +126,7 @@ plot_acc, = axs[1].plot([], [], label="Acceleration (m/s²)")
 axs[0].set_ylabel("Velocity (m/s)")
 axs[0].set_ylim(-1.0, 1.0)   # FIXED bounds for velocity graph
 axs[1].set_ylabel("Acceleration (m/s²)")
+axs[1].set_ylim(-5.0, 5.0)   # FIXED bounds for accel graph
 axs[1].set_xlabel("Time (s)")
 
 for ax in axs:
