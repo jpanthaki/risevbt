@@ -1,3 +1,6 @@
+18-500 Team F4: RiseVBT
+
+
 This system presents a novel velocity-
 based training system that integrates dual IMU sensors
 with an iPhone camera to quantify athletic performance
