@@ -11,3 +11,5 @@ analytical framework than conventional methods in-
 volving standalone sensors, thereby contributing to the
 enhancement of performance monitoring and training
 efficacy in strength sports.
+
+https://course.ece.cmu.edu/~ece500/projects/s25-teamf4/
